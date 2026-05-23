@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>课程项目推进工作台原型</title>
+  <style>
+    :root {
+      --bg: #f7f5ef;
+      --panel: #ffffff;
+      --panel-soft: #fbfaf6;
+      --ink: #161616;
+      --muted: #7b7468;
+      --line: #e5dfd2;
+      --gold: #efbf38;
+      --gold-soft: #fff4ca;
+      --green: #2f8d5c;
+      --green-soft: #e8f6ee;
+      --blue: #286da8;
+      --blue-soft: #e7f0f8;
+      --red: #c93c36;
+      --red-soft: #fff0ee;
+      --dark: #24211b;
+      --shadow: 0 10px 30px rgba(36, 33, 27, 0.08);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 248px minmax(640px, 1fr) 360px;
+    }
+
+    .sidebar {
+      background: var(--dark);
+      color: #fff;
+      padding: 24px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: var(--gold);
+      color: var(--dark);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 20px;
+      font-family: serif;
+    }
+
+    .brand-title { font-size: 16px; font-weight: 800; line-height: 1.2; }
+    .brand-sub { margin-top: 3px; font-size: 11px; color: rgba(255,255,255,0.56); }
+
+    .project-picker {
+      padding: 14px;
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .project-picker label {
+      display: block;
+      color: rgba(255,255,255,0.52);
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+
+    .project-picker select {
+      width: 100%;
+      background: rgba(0,0,0,0.2);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 7px;
+      padding: 9px 10px;
+      outline: none;
+    }
+
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nav-group-label {
+      margin: 12px 8px 4px;
+      color: rgba(255,255,255,0.42);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .nav button.sub {
+      margin-left: 14px;
+      width: calc(100% - 14px);
+      padding: 9px 10px;
+      font-size: 13px;
+    }
+
+    .nav button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 12px;
+      color: rgba(255,255,255,0.72);
+      background: transparent;
+      border-radius: var(--radius);
+      text-align: left;
+      transition: background .15s, color .15s;
+    }
+
+    .nav button.active {
+      color: var(--dark);
+      background: var(--gold);
+      font-weight: 800;
+    }
+
+    .nav button:not(.active):hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .nav small { opacity: .7; font-size: 11px; }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 14px;
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.68);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .main {
+      min-width: 0;
+      overflow: auto;
+      padding: 24px 26px 32px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      color: #aaa396;
+      letter-spacing: .12em;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .meta {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 36px;
+      padding: 0 13px;
+      border-radius: 99px;
+      background: var(--panel);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .btn.primary {
+      background: var(--gold);
+      border-color: var(--gold);
+    }
+
+    .btn.danger {
+      color: var(--red);
+      background: var(--red-soft);
+      border-color: #ffd0cb;
+    }
+
+    .overview {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .hero-panel,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-panel {
+      display: grid;
+      grid-template-columns: 190px 1fr;
+      min-height: 172px;
+      overflow: hidden;
+    }
+
+    .countdown {
+      background: var(--dark);
+      color: #fff;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .countdown .num {
+      font-size: 56px;
+      font-weight: 900;
+      line-height: .9;
+      color: var(--gold);
+    }
+
+    .countdown .label { font-size: 13px; color: rgba(255,255,255,.68); }
+
+    .hero-body {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .progress-line {
+      height: 10px;
+      border-radius: 99px;
+      background: #eee8dc;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 54%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--gold), #3f9c70);
+      transition: width .25s ease;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 10px;
+      border-radius: 7px;
+      background: var(--panel-soft);
+      border: 1px solid #eee9df;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 2px;
+    }
+
+    .stat span { color: var(--muted); font-size: 12px; }
+
+    .risk-panel {
+      padding: 18px;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      font-weight: 900;
+    }
+
+    .risk-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .risk-item {
+      padding: 10px;
+      border-radius: 7px;
+      background: var(--red-soft);
+      border: 1px solid #ffd1cc;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .risk-item b { color: var(--red); }
+
+    .dept-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .dept-card {
+      padding: 16px;
+      cursor: pointer;
+      transition: transform .15s, border-color .15s, box-shadow .15s;
+    }
+
+    .dept-card:hover,
+    .dept-card.selected {
+      transform: translateY(-1px);
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(239,191,56,.18), var(--shadow);
+    }
+
+    .dept-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .dept-name { font-weight: 900; }
+    .dept-rate { font-size: 24px; font-weight: 900; }
+    .dept-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .mini-metric {
+      border-radius: 7px;
+      background: var(--panel-soft);
+      border: 1px solid #eee9df;
+      padding: 8px;
+    }
+
+    .mini-metric strong { display: block; font-size: 16px; }
+    .mini-metric span { color: var(--muted); font-size: 11px; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .task-panel {
+      padding: 16px;
+    }
+
+    .task-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .search {
+      flex: 1;
+      min-width: 180px;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      padding: 0 14px;
+      outline: none;
+      background: var(--panel-soft);
+    }
+
+    .seg {
+      height: 32px;
+      border-radius: 99px;
+      padding: 0 11px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .seg.active {
+      background: var(--dark);
+      color: #fff;
+      border-color: var(--dark);
+    }
+
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .task {
+      display: grid;
+      grid-template-columns: 26px 1fr 72px 92px 96px 76px;
+      align-items: center;
+      gap: 10px;
+      padding: 11px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: #fff;
+      transition: border-color .15s, background .15s;
+    }
+
+    .task.selected {
+      border-color: var(--gold);
+      background: #fffdf5;
+    }
+
+    .check {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 1.5px solid #cfc6b5;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      color: var(--dark);
+      font-weight: 900;
+    }
+
+    .check.done {
+      background: var(--gold);
+      border-color: var(--gold);
+    }
+
+    .task-title { font-size: 13px; font-weight: 800; }
+    .task-note { margin-top: 3px; font-size: 12px; color: var(--muted); }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 58px;
+      height: 24px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid transparent;
+    }
+
+    .tag.doing { background: var(--blue-soft); color: var(--blue); border-color: #bbd7ee; }
+    .tag.done { background: var(--green-soft); color: var(--green); border-color: #b9dfca; }
+    .tag.todo { background: #f3f0e8; color: #766d5f; border-color: #e2dbce; }
+    .tag.risk { background: var(--red-soft); color: var(--red); border-color: #ffc9c3; }
+
+    .due { font-size: 12px; color: var(--muted); }
+
+    .side-detail {
+      position: sticky;
+      top: 0;
+      padding: 16px;
+    }
+
+    .detail-section {
+      padding-top: 14px;
+      margin-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .detail-label {
+      font-size: 11px;
+      color: #aaa396;
+      font-weight: 800;
+      margin-bottom: 7px;
+    }
+
+    .textarea {
+      width: 100%;
+      min-height: 86px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px;
+      outline: none;
+      background: var(--panel-soft);
+      line-height: 1.6;
+    }
+
+    .upload-zone {
+      display: grid;
+      place-items: center;
+      min-height: 112px;
+      border: 1.5px dashed #cfc6b5;
+      border-radius: 8px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      text-align: center;
+      padding: 16px;
+      transition: border-color .15s, background .15s;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.dragging {
+      border-color: var(--gold);
+      background: #fffaf0;
+    }
+
+    .upload-zone strong {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+
+    .asset-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .asset-row {
+      display: grid;
+      grid-template-columns: 44px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .asset-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 7px;
+      background: #efe8db;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .asset-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .asset-name {
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .asset-meta {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .asset-btn {
+      height: 28px;
+      padding: 0 9px;
+      border-radius: 99px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .rightbar {
+      border-left: 1px solid var(--line);
+      background: #fbfaf6;
+      overflow: auto;
+      padding: 24px 20px;
+    }
+
+    .right-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .library-filter {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .library-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    .library-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .library-preview {
+      height: 86px;
+      background: #efe8db;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-weight: 900;
+      position: relative;
+    }
+
+    .library-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .library-info {
+      padding: 8px;
+    }
+
+    .library-info b {
+      display: block;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .version-badge {
+      position: absolute;
+      right: 6px;
+      top: 6px;
+      height: 22px;
+      padding: 0 7px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 99px;
+      background: rgba(36,33,27,.82);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .empty-library {
+      grid-column: 1 / -1;
+      padding: 22px 12px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      background: var(--panel-soft);
+    }
+
+    .funnel {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .funnel-row {
+      display: grid;
+      grid-template-columns: 74px 1fr 46px;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .bar {
+      height: 9px;
+      border-radius: 99px;
+      background: #ece5d8;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--gold);
+    }
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .time {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      background: var(--dark);
+      color: #fff;
+      border-radius: 99px;
+      padding: 10px 18px;
+      font-size: 13px;
+      box-shadow: 0 12px 34px rgba(0,0,0,.2);
+      transition: transform .2s, opacity .2s;
+      z-index: 20;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .mobile-tabs {
+      display: none;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--bg);
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    @media (max-width: 1180px) {
+      body { overflow: auto; }
+      .app {
+        height: auto;
+        min-height: 100vh;
+        grid-template-columns: 220px minmax(0, 1fr);
+      }
+      .rightbar { display: none; }
+      .overview, .workspace { grid-template-columns: 1fr; }
+      .dept-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 760px) {
+      .app { display: block; }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 12px;
+        gap: 10px;
+      }
+      .brand { padding-bottom: 10px; }
+      .project-picker, .sidebar-footer { display: none; }
+      .nav {
+        flex-direction: row;
+        overflow-x: auto;
+      }
+      .nav button {
+        min-width: 108px;
+        justify-content: center;
+      }
+      .nav small { display: none; }
+      .main {
+        padding: 16px;
+        overflow: visible;
+      }
+      .topbar {
+        display: block;
+      }
+      .top-actions {
+        justify-content: flex-start;
+        margin-top: 14px;
+      }
+      .hero-panel { grid-template-columns: 1fr; }
+      .countdown {
+        min-height: 126px;
+        flex-direction: row;
+        align-items: end;
+      }
+      .hero-stats { grid-template-columns: repeat(2, 1fr); }
+      .dept-grid { grid-template-columns: 1fr; }
+      .task {
+        grid-template-columns: 24px 1fr;
+        align-items: start;
+      }
+      .task > .tag, .task > .due, .task > button {
+        grid-column: 2;
+        width: fit-content;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">初</div>
+        <div>
+          <div class="brand-title">项目推进台</div>
+          <div class="brand-sub">课程活动执行进度</div>
+        </div>
+      </div>
+
+      <div class="project-picker">
+        <label>当前项目</label>
+        <select id="projectSelect">
+          <option>5月月底课程活动</option>
+          <option>6月招商说明会</option>
+          <option>私董会闭门沙龙</option>
+        </select>
+      </div>
+
+      <nav class="nav" id="nav">
+        <button class="active" data-filter="all">项目总览 <small>18</small></button>
+        <button data-filter="招商组">招商中心 <small>6</small></button>
+        <div class="nav-group-label">市场中心</div>
+        <button data-filter="市场中心">市场总览 <small>12</small></button>
+        <button class="sub" data-filter="设计">设计工作台 <small>3</small></button>
+        <button class="sub" data-filter="文案">文案工作台 <small>3</small></button>
+        <button class="sub" data-filter="短视频">短视频工作台 <small>2</small></button>
+        <button class="sub" data-filter="运营">运营工作台 <small>2</small></button>
+        <button class="sub" data-filter="客服组">客服工作台 <small>3</small></button>
+        <button class="sub" data-filter="现场组">现场执行 <small>2</small></button>
+        <button data-filter="图片库">项目图片库 <small id="assetNavCount">0</small></button>
+        <button data-filter="风险">风险提醒 <small>3</small></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        今日重点：确认招商到场名单、完成主视觉海报、发布第二轮朋友圈预热。
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <div class="eyebrow">PROJECT CONTROL</div>
+          <h1 id="projectTitle">5月月底课程活动</h1>
+          <div class="meta">活动日期：2026-05-31 · 负责人：运营中心 · 当前阶段：集中邀约与物料预热</div>
+        </div>
+        <div class="top-actions">
+          <button class="btn" id="copySummary">复制日报</button>
+          <button class="btn" id="riskOnly">只看风险</button>
+          <button class="btn primary" id="addTask">新增任务</button>
+        </div>
+      </div>
+
+      <section class="overview">
+        <div class="hero-panel">
+          <div class="countdown">
+            <div>
+              <div class="num" id="daysLeft">17</div>
+              <div class="label">天后开课</div>
+            </div>
+            <div class="label">关键节点：报名确认、课前预热、现场物料</div>
+          </div>
+          <div class="hero-body">
+            <div>
+              <div class="panel-title">
+                <span>整体完成度</span>
+                <span id="overallRate">54%</span>
+              </div>
+              <div class="progress-line"><div class="progress-fill" id="overallBar"></div></div>
+            </div>
+            <div class="hero-stats">
+              <div class="stat"><strong id="doneCount">0</strong><span>已完成任务</span></div>
+              <div class="stat"><strong id="doingCount">0</strong><span>进行中任务</span></div>
+              <div class="stat"><strong id="riskCount">0</strong><span>风险任务</span></div>
+              <div class="stat"><strong>38/80</strong><span>确认到场人数</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="risk-panel panel">
+          <div class="panel-title">
+            <span>风险提醒</span>
+            <button class="seg" data-status-filter="risk">查看</button>
+          </div>
+          <div class="risk-list" id="riskList"></div>
+        </div>
+      </section>
+
+      <section class="dept-grid" id="deptGrid"></section>
+
+      <section class="workspace">
+        <div class="task-panel panel">
+          <div class="panel-title">
+            <span id="taskTitle">全部任务</span>
+            <span id="taskCount">18项</span>
+          </div>
+          <div class="task-toolbar">
+            <input class="search" id="searchInput" placeholder="搜索任务、负责人、备注" />
+            <button class="seg active" data-status-filter="all">全部</button>
+            <button class="seg" data-status-filter="todo">未开始</button>
+            <button class="seg" data-status-filter="doing">进行中</button>
+            <button class="seg" data-status-filter="done">已完成</button>
+            <button class="seg" data-status-filter="risk">有风险</button>
+          </div>
+          <div class="task-list" id="taskList"></div>
+        </div>
+
+        <aside class="side-detail panel" id="detailPanel">
+          <div class="panel-title">
+            <span>任务详情</span>
+            <span class="tag doing" id="detailStatus">进行中</span>
+          </div>
+          <h3 id="detailName" style="margin: 0 0 6px; font-size: 18px;">选择一条任务</h3>
+          <div class="meta" id="detailMeta">点击左侧任务查看详情</div>
+          <div class="detail-section">
+            <div class="detail-label">备注</div>
+            <textarea class="textarea" id="detailNote"></textarea>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">任务成果</div>
+            <input id="assetInput" type="file" multiple hidden />
+            <button class="upload-zone" id="uploadZone">
+              <span>
+                <strong>上传成果文件</strong>
+                只有图片会自动进入项目图片库；非图片只保留在当前任务成果里
+              </span>
+            </button>
+            <div class="asset-list" id="taskAssets"></div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">快速操作</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn primary" id="markDone">标记完成</button>
+              <button class="btn" id="markDoing">设为进行中</button>
+              <button class="btn danger" id="markRisk">标记风险</button>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <aside class="rightbar">
+      <div class="right-card">
+        <div class="panel-title"><span>项目图片库</span><span id="libraryCount">0项</span></div>
+        <div class="library-filter" id="libraryFilter">
+          <button class="seg active" data-asset-type="all">全部图片</button>
+          <button class="seg" data-asset-type="海报">海报</button>
+          <button class="seg" data-asset-type="朋友圈图">朋友圈图</button>
+          <button class="seg" data-asset-type="长图">长图</button>
+          <button class="seg" data-asset-type="二维码图">二维码图</button>
+          <button class="seg" data-asset-type="现场照片">现场照片</button>
+        </div>
+        <div class="library-grid" id="libraryGrid"></div>
+      </div>
+
+      <div class="right-card">
+        <div class="panel-title"><span>招商漏斗</span><span>本周</span></div>
+        <div class="funnel" id="funnel"></div>
+      </div>
+
+      <div class="right-card">
+        <div class="panel-title"><span>市场物料</span><span>7项</span></div>
+        <div class="timeline" id="marketTimeline"></div>
+      </div>
+
+      <div class="right-card">
+        <div class="panel-title"><span>下一步建议</span></div>
+        <div style="font-size:13px; color:var(--muted); line-height:1.8;">
+          招商确认人数低于目标节奏，建议今天优先处理高意向名单，并同步客服准备课前确认话术。市场中心需在48小时内完成主视觉和第二轮预热文案。
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast">已更新</div>
+
+  <script>
+    const tasks = [
+      { id: 1, dept: "招商组", name: "整理高意向客户名单", owner: "张婷", due: "05-15", status: "done", note: "已按意向等级分为A/B/C三组，A类客户优先电话确认。" },
+      { id: 2, dept: "招商组", name: "完成第一轮电话邀约", owner: "刘峰", due: "05-17", status: "doing", note: "目标联系120人，目前已联系76人，有意向42人。" },
+      { id: 3, dept: "招商组", name: "确认到场名单达到80人", owner: "刘峰", due: "05-24", status: "risk", note: "当前确认38人，低于计划节奏，需要增加二次跟进。" },
+      { id: 4, dept: "招商组", name: "准备招商政策说明话术", owner: "周敏", due: "05-18", status: "doing", note: "费用、权益、名额限制三类问题需要统一口径。" },
+      { id: 5, dept: "招商组", name: "邀约重点客户到场", owner: "张婷", due: "05-26", status: "todo", note: "重点客户名单待老板确认后推进。" },
+      { id: 6, dept: "招商组", name: "成交意向客户课前沟通", owner: "周敏", due: "05-29", status: "todo", note: "课程前两天发送提醒和资料包。" },
+      { id: 7, dept: "设计", name: "课程主视觉海报", owner: "陈佳", due: "05-16", status: "risk", note: "讲师照片和课程主题需最终确认。" },
+      { id: 8, dept: "文案", name: "公众号预热推文第一篇", owner: "王蕾", due: "05-17", status: "doing", note: "标题已定，正文还需补成功案例。" },
+      { id: 9, dept: "设计", name: "朋友圈九宫格图片", owner: "陈佳", due: "05-18", status: "todo", note: "需根据主视觉延展。" },
+      { id: 10, dept: "短视频", name: "短视频口播脚本三条", owner: "林森", due: "05-19", status: "doing", note: "第一条已完成，剩余两条围绕课程收益。" },
+      { id: 11, dept: "文案", name: "社群预热文案", owner: "王蕾", due: "05-20", status: "todo", note: "分为开课前7天、3天、1天三版。" },
+      { id: 12, dept: "短视频", name: "活动当天拍摄清单", owner: "林森", due: "05-27", status: "todo", note: "需列出签到、授课、互动、合影等镜头。" },
+      { id: 13, dept: "文案", name: "课后复盘宣传稿", owner: "王蕾", due: "06-01", status: "todo", note: "等课程结束后补现场照片和学员反馈。" },
+      { id: 14, dept: "客服组", name: "整理报名咨询FAQ", owner: "李曼", due: "05-16", status: "done", note: "费用、地点、时间、停车、发票问题已整理。" },
+      { id: 15, dept: "客服组", name: "报名名单信息核对", owner: "李曼", due: "05-25", status: "doing", note: "需要和招商组名单每日同步。" },
+      { id: 16, dept: "客服组", name: "课前提醒短信和微信", owner: "赵晴", due: "05-29", status: "todo", note: "课前一天发送定位、时间、注意事项。" },
+      { id: 17, dept: "现场组", name: "场地桌椅与签到台", owner: "何宇", due: "05-28", status: "todo", note: "按80人规模准备，预留10个机动席位。" },
+      { id: 18, dept: "现场组", name: "课件、音响、投影测试", owner: "何宇", due: "05-30", status: "risk", note: "讲师课件还未收到，影响提前测试。" },
+      { id: 19, dept: "运营", name: "项目排期与跨岗协调", owner: "许诺", due: "05-18", status: "doing", note: "每天同步招商、设计、文案和客服关键阻塞。" },
+      { id: 20, dept: "运营", name: "课前物料最终检查", owner: "许诺", due: "05-29", status: "todo", note: "确认海报、签到表、二维码、现场指引图均为最新版。" }
+    ];
+
+    const assets = [
+      {
+        id: 1,
+        taskId: 7,
+        type: "海报",
+        name: "课程主视觉海报-方向稿.png",
+        owner: "陈佳",
+        time: "05-14 16:20",
+        source: "课程主视觉海报",
+        dataUrl: "",
+        mime: "image/png",
+        version: 1,
+        status: "待确认"
+      },
+      {
+        id: 2,
+        taskId: 9,
+        type: "朋友圈图",
+        name: "朋友圈九宫格-第一张.png",
+        owner: "陈佳",
+        time: "05-15 09:30",
+        source: "朋友圈九宫格图片",
+        dataUrl: "",
+        mime: "image/png",
+        version: 1,
+        status: "草稿"
+      }
+    ];
+
+    let assetFilter = "all";
+
+    const deptMeta = [
+      { name: "招商组", color: "gold", metrics: [["120", "已联系"], ["42", "有意向"], ["38", "确认"]] },
+      { name: "市场中心", color: "blue", metrics: [["2/12", "已完成"], ["5", "进行中"], ["1", "风险"]] },
+      { name: "客服组", color: "green", metrics: [["1/3", "已完成"], ["2", "待跟进"], ["0", "风险"]] }
+    ];
+
+    const funnel = [
+      ["目标人数", 80, 100],
+      ["已联系", 76, 95],
+      ["有意向", 42, 53],
+      ["确认到场", 38, 48],
+      ["已付款", 21, 26]
+    ];
+
+    let currentFilter = "all";
+    let statusFilter = "all";
+    let selectedTaskId = 2;
+
+    const els = {
+      nav: document.getElementById("nav"),
+      deptGrid: document.getElementById("deptGrid"),
+      taskList: document.getElementById("taskList"),
+      searchInput: document.getElementById("searchInput"),
+      taskTitle: document.getElementById("taskTitle"),
+      taskCount: document.getElementById("taskCount"),
+      riskList: document.getElementById("riskList"),
+      overallRate: document.getElementById("overallRate"),
+      overallBar: document.getElementById("overallBar"),
+      doneCount: document.getElementById("doneCount"),
+      doingCount: document.getElementById("doingCount"),
+      riskCount: document.getElementById("riskCount"),
+      detailStatus: document.getElementById("detailStatus"),
+      detailName: document.getElementById("detailName"),
+      detailMeta: document.getElementById("detailMeta"),
+      detailNote: document.getElementById("detailNote"),
+      assetInput: document.getElementById("assetInput"),
+      uploadZone: document.getElementById("uploadZone"),
+      taskAssets: document.getElementById("taskAssets"),
+      toast: document.getElementById("toast")
+    };
+
+    function showToast(text) {
+      els.toast.textContent = text;
+      els.toast.classList.add("show");
+      setTimeout(() => els.toast.classList.remove("show"), 1600);
+    }
+
+    function statusText(status) {
+      return ({ todo: "未开始", doing: "进行中", done: "已完成", risk: "有风险" })[status] || status;
+    }
+
+    function statusClass(status) {
+      return "tag " + status;
+    }
+
+    function assetTypeForTask(task) {
+      if (task.name.includes("海报") || task.name.includes("视觉")) return "海报";
+      if (task.name.includes("朋友圈") || task.name.includes("九宫格")) return "朋友圈图";
+      if (task.name.includes("长图")) return "长图";
+      if (task.name.includes("二维码")) return "二维码图";
+      if (task.name.includes("现场") || task.name.includes("拍摄")) return "现场照片";
+      return "其他图片";
+    }
+
+    function assetsForTask(taskId) {
+      return assets.filter(asset => asset.taskId === taskId);
+    }
+
+    function fileIcon(asset) {
+      if (asset.mime && asset.mime.startsWith("image/") && asset.dataUrl) {
+        return `<img src="${asset.dataUrl}" alt=""><span class="version-badge">v${asset.version || 1}</span>`;
+      }
+      if (asset.mime && asset.mime.startsWith("image/")) return `图<span class="version-badge">v${asset.version || 1}</span>`;
+      if (asset.name.endsWith(".txt") || asset.name.endsWith(".docx")) return "文";
+      return "件";
+    }
+
+    function filteredTasks() {
+      const keyword = els.searchInput.value.trim();
+      return tasks.filter(task => {
+        const marketDepts = ["设计", "文案", "短视频", "运营", "客服组", "现场组"];
+        const byDept = currentFilter === "all"
+          || task.dept === currentFilter
+          || (currentFilter === "市场中心" && marketDepts.includes(task.dept))
+          || (currentFilter === "风险" && task.status === "risk")
+          || (currentFilter === "图片库" && assetsForTask(task.id).length > 0);
+        const byStatus = statusFilter === "all" || task.status === statusFilter;
+        const byKeyword = !keyword || [task.name, task.owner, task.note, task.dept].some(text => text.includes(keyword));
+        return byDept && byStatus && byKeyword;
+      });
+    }
+
+    function renderOverview() {
+      const done = tasks.filter(t => t.status === "done").length;
+      const doing = tasks.filter(t => t.status === "doing").length;
+      const risk = tasks.filter(t => t.status === "risk").length;
+      const rate = Math.round(done / tasks.length * 100);
+      els.doneCount.textContent = done;
+      els.doingCount.textContent = doing;
+      els.riskCount.textContent = risk;
+      els.overallRate.textContent = rate + "%";
+      els.overallBar.style.width = Math.max(rate, 8) + "%";
+      els.riskList.innerHTML = tasks.filter(t => t.status === "risk").slice(0, 4).map(task =>
+        `<div class="risk-item"><b>${task.dept}</b> ${task.name}<br>${task.note}</div>`
+      ).join("");
+    }
+
+    function renderDepartments() {
+      els.deptGrid.innerHTML = deptMeta.map(dept => {
+        const deptTasks = tasks.filter(t => t.dept === dept.name);
+        const done = deptTasks.filter(t => t.status === "done").length;
+        const rate = Math.round(done / deptTasks.length * 100);
+        const selected = currentFilter === dept.name ? " selected" : "";
+        return `
+          <button class="dept-card panel${selected}" data-dept="${dept.name}">
+            <div class="dept-head">
+              <div>
+                <div class="dept-name">${dept.name}</div>
+                <div class="dept-sub">${deptTasks.length} 项任务 · ${deptTasks.filter(t => t.status === "risk").length} 项风险</div>
+              </div>
+              <div class="dept-rate">${rate}%</div>
+            </div>
+            <div class="progress-line"><div class="progress-fill" style="width:${Math.max(rate, 6)}%"></div></div>
+            <div class="metric-row">
+              ${dept.metrics.map(item => `<div class="mini-metric"><strong>${item[0]}</strong><span>${item[1]}</span></div>`).join("")}
+            </div>
+          </button>
+        `;
+      }).join("");
+      document.querySelectorAll(".dept-card").forEach(card => {
+        card.addEventListener("click", () => {
+          currentFilter = card.dataset.dept;
+          statusFilter = "all";
+          updateActiveControls();
+          renderAll();
+        });
+      });
+    }
+
+    function renderTasks() {
+      const list = filteredTasks();
+      els.taskTitle.textContent = currentFilter === "all" ? "全部任务" : currentFilter === "风险" ? "风险任务" : currentFilter === "图片库" ? "已有图片成果的任务" : currentFilter + "任务";
+      els.taskCount.textContent = list.length + "项";
+      els.taskList.innerHTML = list.map(task => `
+        <div class="task ${task.id === selectedTaskId ? "selected" : ""}" data-id="${task.id}">
+          <button class="check ${task.status === "done" ? "done" : ""}" data-toggle="${task.id}">${task.status === "done" ? "✓" : ""}</button>
+          <div>
+            <div class="task-title">${task.name}</div>
+            <div class="task-note">${task.dept} · ${task.owner} · ${task.note}</div>
+          </div>
+          <span class="tag ${assetsForTask(task.id).length ? "done" : "todo"}">${assetsForTask(task.id).length ? assetsForTask(task.id).length + "个成果" : "未上传"}</span>
+          <span class="${statusClass(task.status)}">${statusText(task.status)}</span>
+          <span class="due">截止 ${task.due}</span>
+          <button class="btn" data-focus="${task.id}" style="height:30px; padding:0 10px;">查看</button>
+        </div>
+      `).join("");
+
+      document.querySelectorAll(".task").forEach(row => {
+        row.addEventListener("click", event => {
+          if (event.target.dataset.toggle) return;
+          selectedTaskId = Number(row.dataset.id);
+          renderAll();
+        });
+      });
+      document.querySelectorAll("[data-toggle]").forEach(btn => {
+        btn.addEventListener("click", event => {
+          event.stopPropagation();
+          const task = tasks.find(t => t.id === Number(btn.dataset.toggle));
+          task.status = task.status === "done" ? "doing" : "done";
+          showToast(task.status === "done" ? "已标记完成" : "已恢复为进行中");
+          renderAll();
+        });
+      });
+    }
+
+    function renderDetail() {
+      const task = tasks.find(t => t.id === selectedTaskId) || filteredTasks()[0] || tasks[0];
+      selectedTaskId = task.id;
+      els.detailStatus.className = statusClass(task.status);
+      els.detailStatus.textContent = statusText(task.status);
+      els.detailName.textContent = task.name;
+      els.detailMeta.textContent = `${task.dept} · 负责人：${task.owner} · 截止：${task.due}`;
+      els.detailNote.value = task.note;
+      const taskAssets = assetsForTask(task.id);
+      els.taskAssets.innerHTML = taskAssets.length ? taskAssets.map(asset => `
+        <div class="asset-row">
+          <div class="asset-thumb">${fileIcon(asset)}</div>
+          <div>
+            <div class="asset-name">${asset.name}</div>
+            <div class="asset-meta">${asset.type} · v${asset.version || 1} · ${asset.status || "待确认"} · ${asset.owner}</div>
+          </div>
+          <button class="asset-btn" data-download-asset="${asset.id}">获取</button>
+        </div>
+      `).join("") : `<div class="asset-meta">还没有上传成果。设计海报、市场文案、招商话术会自动进入项目素材库。</div>`;
+    }
+
+    function renderRightbar() {
+      document.getElementById("funnel").innerHTML = funnel.map(item => `
+        <div class="funnel-row">
+          <span>${item[0]}</span>
+          <div class="bar"><span style="width:${item[2]}%"></span></div>
+          <b>${item[1]}</b>
+        </div>
+      `).join("");
+      document.getElementById("marketTimeline").innerHTML = tasks.filter(t => ["设计", "文案", "短视频", "运营", "客服组", "现场组"].includes(t.dept)).slice(0, 5).map(task => `
+        <div class="timeline-item">
+          <div class="time">${task.due}</div>
+          <div><b>${task.name}</b><br><span style="color:var(--muted)">${statusText(task.status)} · ${task.owner}</span></div>
+        </div>
+      `).join("");
+      const list = assets.filter(asset => asset.mime.startsWith("image/") && (assetFilter === "all" || asset.type === assetFilter));
+      document.getElementById("libraryCount").textContent = list.length + "项";
+      document.getElementById("assetNavCount").textContent = assets.filter(asset => asset.mime.startsWith("image/")).length;
+      document.getElementById("libraryGrid").innerHTML = list.map(asset => `
+        <div class="library-item" data-library-asset="${asset.id}">
+          <div class="library-preview">${fileIcon(asset)}</div>
+          <div class="library-info">
+            <b>${asset.name}</b>
+            <div class="asset-meta">${asset.type} · v${asset.version || 1} · ${asset.status || "待确认"}<br>来源：${asset.source}</div>
+          </div>
+        </div>
+      `).join("") || `<div class="empty-library">暂无该类型图片。上传图片成果后会自动出现在这里。</div>`;
+    }
+
+    function updateActiveControls() {
+      document.querySelectorAll(".nav button").forEach(btn => btn.classList.toggle("active", btn.dataset.filter === currentFilter));
+      document.querySelectorAll("[data-status-filter]").forEach(btn => btn.classList.toggle("active", btn.dataset.statusFilter === statusFilter));
+      document.querySelectorAll("[data-asset-type]").forEach(btn => btn.classList.toggle("active", btn.dataset.assetType === assetFilter));
+    }
+
+    function renderAll() {
+      renderOverview();
+      renderDepartments();
+      renderTasks();
+      renderDetail();
+      renderRightbar();
+      updateActiveControls();
+    }
+
+    els.nav.addEventListener("click", event => {
+      const btn = event.target.closest("button[data-filter]");
+      if (!btn) return;
+      currentFilter = btn.dataset.filter;
+      statusFilter = currentFilter === "风险" ? "risk" : "all";
+      renderAll();
+    });
+
+    document.querySelectorAll("[data-status-filter]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        statusFilter = btn.dataset.statusFilter;
+        if (btn.closest(".risk-panel")) currentFilter = "风险";
+        renderAll();
+      });
+    });
+
+    document.querySelectorAll("[data-asset-type]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        assetFilter = btn.dataset.assetType;
+        renderAll();
+      });
+    });
+
+    els.searchInput.addEventListener("input", renderTasks);
+
+    document.getElementById("markDone").addEventListener("click", () => {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      task.status = "done";
+      showToast("任务已完成");
+      renderAll();
+    });
+    document.getElementById("markDoing").addEventListener("click", () => {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      task.status = "doing";
+      showToast("任务已进入进行中");
+      renderAll();
+    });
+    document.getElementById("markRisk").addEventListener("click", () => {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      task.status = "risk";
+      showToast("已标记风险");
+      renderAll();
+    });
+    els.detailNote.addEventListener("change", () => {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      task.note = els.detailNote.value;
+      showToast("备注已更新");
+      renderAll();
+    });
+
+    function uploadFiles(files) {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      if (!task || files.length === 0) return;
+      Array.from(files).forEach(file => {
+        const isImage = file.type.startsWith("image/");
+        const asset = {
+          id: Date.now() + Math.floor(Math.random() * 10000),
+          taskId: task.id,
+          type: assetTypeForTask(task),
+          name: file.name,
+          owner: task.owner,
+          time: "刚刚",
+          source: task.name,
+          dataUrl: "",
+          mime: file.type || "application/octet-stream",
+          version: 1,
+          status: isImage ? "待确认" : "任务附件"
+        };
+        if (isImage) {
+          const reader = new FileReader();
+          reader.onload = event => {
+            asset.dataUrl = String(event.target.result || "");
+            assets.unshift(asset);
+            showToast("图片成果已上传，并归档到项目图片库");
+            renderAll();
+          };
+          reader.readAsDataURL(file);
+        } else {
+          assets.unshift(asset);
+          showToast("成果已上传；非图片不会进入项目图片库");
+          renderAll();
+        }
+      });
+    }
+
+    els.uploadZone.addEventListener("click", () => els.assetInput.click());
+    els.assetInput.addEventListener("change", event => uploadFiles(event.target.files));
+    els.uploadZone.addEventListener("dragover", event => {
+      event.preventDefault();
+      els.uploadZone.classList.add("dragging");
+    });
+    els.uploadZone.addEventListener("dragleave", () => els.uploadZone.classList.remove("dragging"));
+    els.uploadZone.addEventListener("drop", event => {
+      event.preventDefault();
+      els.uploadZone.classList.remove("dragging");
+      uploadFiles(event.dataTransfer.files);
+    });
+
+    document.addEventListener("click", event => {
+      const downloadBtn = event.target.closest("[data-download-asset]");
+      if (downloadBtn) {
+        const asset = assets.find(item => item.id === Number(downloadBtn.dataset.downloadAsset));
+        if (!asset) return;
+        if (asset.dataUrl) {
+          const link = document.createElement("a");
+          link.href = asset.dataUrl;
+          link.download = asset.name;
+          link.click();
+        } else {
+          showToast("原型内展示为资料记录，正式版可下载原文件");
+        }
+      }
+      const libraryItem = event.target.closest("[data-library-asset]");
+      if (libraryItem) {
+        const asset = assets.find(item => item.id === Number(libraryItem.dataset.libraryAsset));
+        const task = tasks.find(item => item.id === asset.taskId);
+        selectedTaskId = task.id;
+        currentFilter = "素材库";
+        showToast("已定位到来源任务");
+        renderAll();
+      }
+    });
+
+    document.getElementById("riskOnly").addEventListener("click", () => {
+      currentFilter = "风险";
+      statusFilter = "risk";
+      renderAll();
+    });
+
+    document.getElementById("copySummary").addEventListener("click", async () => {
+      const done = tasks.filter(t => t.status === "done").length;
+      const risk = tasks.filter(t => t.status === "risk").length;
+      const summary = `5月月底课程活动日报：已完成${done}/${tasks.length}项，风险${risk}项。招商确认到场38/80人。今日重点：推进高意向客户确认、完成主视觉海报、发布预热内容。`;
+      await navigator.clipboard.writeText(summary).catch(() => {});
+      showToast("日报已复制");
+    });
+
+    document.getElementById("addTask").addEventListener("click", () => {
+      const nextId = Math.max(...tasks.map(t => t.id)) + 1;
+      tasks.unshift({
+        id: nextId,
+        dept: currentFilter === "all" || currentFilter === "风险" ? "市场中心" : currentFilter,
+        name: "新任务：待填写",
+        owner: "未分配",
+        due: "05-20",
+        status: "todo",
+        note: "点击右侧详情修改备注。"
+      });
+      selectedTaskId = nextId;
+      showToast("已新增任务");
+      renderAll();
+    });
+
+    document.getElementById("projectSelect").addEventListener("change", event => {
+      document.getElementById("projectTitle").textContent = event.target.value;
+      showToast("已切换项目原型");
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>
