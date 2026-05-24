@@ -24,6 +24,7 @@ import { Task, TaskRole, TaskPriority, TaskResultType, TASK_ROLES } from "../dat
 import { roleColor } from "../lib/taskUtils";
 import { formatDisplayDateTime } from "../lib/dateFormat";
 import { PageShell } from "../components/PageShell";
+import { DateTimePicker } from "../components/DateTimePicker";
 import { NavKey } from "../components/Sidebar";
 
 interface PublishTaskProps {
@@ -648,7 +649,7 @@ function StepEditor({
           </div>
         </Row>
         <Row label="截止时间" required>
-          <input type="datetime-local" value={step.deadline} onChange={e => onChange({ deadline: e.target.value })} style={inputStyle} />
+          <DateTimePicker value={step.deadline} onChange={deadline => onChange({ deadline })} includeTime />
         </Row>
       </div>
 
@@ -991,7 +992,7 @@ function CollaborationTaskModal({
 
           <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
             <Row label="截止时间" required>
-              <input type="datetime-local" value={step.deadline} onChange={event => onChange({ deadline: event.target.value })} style={inputStyle} />
+              <DateTimePicker value={step.deadline} onChange={deadline => onChange({ deadline })} includeTime />
             </Row>
             <Row label="成果类型">
               <select value={step.resultType} onChange={event => onChange({ resultType: event.target.value as TaskResultType })} style={inputStyle}>

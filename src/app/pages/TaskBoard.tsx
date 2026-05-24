@@ -31,6 +31,7 @@ import {
 } from "../lib/taskUtils";
 import { buildTaskChain, sortChain } from "../lib/taskChain";
 import { PageShell } from "../components/PageShell";
+import { DateTimePicker } from "../components/DateTimePicker";
 import { NavKey } from "../components/Sidebar";
 import { formatWeekDateTime } from "../lib/dateFormat";
 
@@ -594,7 +595,7 @@ function EditTaskModal({ task, onClose, onSave }: { task: Task; onClose: () => v
             <input value={owner} onChange={event => setOwner(event.target.value)} />
           </TaskField>
           <TaskField label="截止时间">
-            <input type={deadline.includes("T") ? "datetime-local" : "date"} value={deadline} onChange={event => setDeadline(event.target.value)} />
+            <DateTimePicker value={deadline} onChange={setDeadline} includeTime={deadline.includes("T")} />
           </TaskField>
           <TaskField label="优先级">
             <select value={priority} onChange={event => setPriority(event.target.value as TaskPriority)}>

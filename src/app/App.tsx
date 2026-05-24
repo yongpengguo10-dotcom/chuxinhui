@@ -32,6 +32,7 @@ export default function App() {
   const initialState = useMemo(() => loadWorkbenchState(), []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeNav, setActiveNav] = useState<NavKey>("overview");
+  const [createProjectRequest, setCreateProjectRequest] = useState(0);
   const [currentRole, setCurrentRole] = useState<UserRole>("管理员");
   const [projects, setProjects] = useState<Project[]>(initialState.projects);
   const [tasks, setTasks] = useState<Task[]>(initialState.tasks);
@@ -77,6 +78,11 @@ export default function App() {
     if (!canAccessNav(currentRole, key)) {
       showToast("当前角色没有这个页面的操作权限");
       setActiveNav("overview");
+      return;
+    }
+    if (key === "control.create") {
+      setActiveNav("overview");
+      setCreateProjectRequest(prev => prev + 1);
       return;
     }
     setActiveNav(key);
@@ -215,11 +221,15 @@ export default function App() {
           currentProject={currentProject}
           tasks={tasks}
           projectImages={projectImages}
+          setProjectImages={setProjectImages}
           onSwitchProject={onSwitchProject}
           onCreateProject={onCreateProject}
           onUpdateProject={onUpdateProject}
           onDeleteProject={onDeleteProject}
           canCreateProject={canManageData}
+          currentRole={currentRole}
+          onRoleChange={handleRoleChange}
+          createProjectRequest={createProjectRequest}
           showToast={showToast}
           onNavigate={onNavigate}
           isMobile={isMobile}
@@ -512,11 +522,15 @@ export default function App() {
         currentProject={currentProject}
         tasks={tasks}
         projectImages={projectImages}
+        setProjectImages={setProjectImages}
         onSwitchProject={onSwitchProject}
         onCreateProject={onCreateProject}
         onUpdateProject={onUpdateProject}
         onDeleteProject={onDeleteProject}
         canCreateProject={canManageData}
+        currentRole={currentRole}
+        onRoleChange={handleRoleChange}
+        createProjectRequest={createProjectRequest}
         showToast={showToast}
         onNavigate={onNavigate}
         isMobile={isMobile}
@@ -525,15 +539,20 @@ export default function App() {
     );
   }
 
+  const isOverviewPage = activeNav === "overview";
+
   return (
     <div
       style={{
-        width: "100vw", height: "100vh", display: "flex", overflow: "hidden",
-        background: "#F8F6EF",
+        width: "100vw",
+        height: "100vh",
+        display: "flex",
+        overflow: "hidden",
+        background: isOverviewPage ? "#F9FAFB" : "#F8F6EF",
         fontFamily: "'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      {(!isMobile || drawerOpen) && (
+      {!isOverviewPage && (!isMobile || drawerOpen) && (
         <Sidebar
           activeNav={activeNav}
           onNavChange={onNavigate}
@@ -544,13 +563,16 @@ export default function App() {
         />
       )}
 
-      {pageContent}
+      <div style={{ flex: 1, minWidth: 0, height: "100%" }}>
+        {pageContent}
+      </div>
 
       {canManageData && <div
         className="fixed z-50 flex items-center gap-2 rounded-full"
         style={{
           right: 18,
           bottom: 18,
+          display: isOverviewPage ? "none" : "flex",
           background: "#FFFFFF",
           border: "1.5px solid #E8E3D8",
           boxShadow: "0 8px 28px rgba(0,0,0,0.08)",

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Sparkles, ChevronRight } from "lucide-react";
 import { Project } from "../data/projects";
 import { PageShell } from "../components/PageShell";
+import { DateTimePicker } from "../components/DateTimePicker";
 import { NavKey } from "../components/Sidebar";
 
 interface CreateProjectProps {
@@ -94,12 +95,7 @@ export function CreateProject({
 
           <div className="grid gap-3" style={{ gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr" }}>
             <Row label="活动日期" required>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                style={inputStyle}
-              />
+              <DateTimePicker value={date} onChange={setDate} placeholder="选择活动日期" />
             </Row>
 
             <Row label="项目阶段">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Send, X } from "lucide-react";
 import { Project } from "../data/projects";
 import { Task, TASK_ROLES, TaskPriority, TaskResultType, TaskRole } from "../data/tasks";
+import { DateTimePicker } from "./DateTimePicker";
 
 interface QuickTaskRequestProps {
   requesterRole: TaskRole | "总控";
@@ -143,7 +144,7 @@ export function QuickTaskRequest({
               <div className="quick-request-grid">
                 <label>
                   <span>截止时间</span>
-                  <input type="datetime-local" value={deadline} onChange={event => setDeadline(event.target.value)} />
+                  <DateTimePicker value={deadline} onChange={setDeadline} includeTime />
                 </label>
                 <label>
                   <span>优先级</span>
