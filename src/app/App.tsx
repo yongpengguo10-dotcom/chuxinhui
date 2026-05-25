@@ -17,6 +17,7 @@ import { RoleWorkspace } from "./pages/RoleWorkspace";
 import { DesignWorkspace } from "./pages/DesignWorkspace";
 import { CopyWorkspace } from "./pages/CopyWorkspace";
 import { FieldWorkspace } from "./pages/FieldWorkspace";
+import { GlobalTopNav } from "./components/GlobalTopNav";
 import {
   createDefaultWorkbenchState,
   downloadWorkbenchBackup,
@@ -540,6 +541,7 @@ export default function App() {
   }
 
   const isOverviewPage = activeNav === "overview";
+  const useTopNavLayout = !isMobile;
 
   return (
     <div
@@ -547,24 +549,39 @@ export default function App() {
         width: "100vw",
         height: "100vh",
         display: "flex",
+        flexDirection: useTopNavLayout ? "column" : "row",
         overflow: "hidden",
         background: isOverviewPage ? "#F9FAFB" : "#F8F6EF",
         fontFamily: "'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      {!isOverviewPage && (!isMobile || drawerOpen) && (
-        <Sidebar
+      {useTopNavLayout && (
+        <GlobalTopNav
           activeNav={activeNav}
-          onNavChange={onNavigate}
-          currentRole={currentRole}
-          onRoleChange={handleRoleChange}
-          isMobile={isMobile}
-          onCloseDrawer={closeDrawer}
+          onNavigate={onNavigate}
+          canCreateProject={canManageData}
+          onCreateProject={() => {
+            setActiveNav("overview");
+            setCreateProjectRequest(prev => prev + 1);
+          }}
         />
       )}
 
-      <div style={{ flex: 1, minWidth: 0, height: "100%" }}>
-        {pageContent}
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", overflow: "hidden" }}>
+        {!useTopNavLayout && (!isOverviewPage || drawerOpen) && (
+          <Sidebar
+            activeNav={activeNav}
+            onNavChange={onNavigate}
+            currentRole={currentRole}
+            onRoleChange={handleRoleChange}
+            isMobile={isMobile}
+            onCloseDrawer={closeDrawer}
+          />
+        )}
+
+        <div style={{ flex: 1, minWidth: 0, height: "100%" }}>
+          {pageContent}
+        </div>
       </div>
 
       {canManageData && <div

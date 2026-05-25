@@ -12,7 +12,8 @@ interface DateTimePickerProps {
 }
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
-const QUICK_OPTIONS = ["今天", "明天", "本周", "下周"];
+const QUICK_OPTIONS = ["今天", "明天", "本周", "下周", "自定义"] as const;
+const QUICK_OPTION_SET = new Set(QUICK_OPTIONS);
 
 export function DateTimePicker({
   value,
@@ -29,12 +30,22 @@ export function DateTimePicker({
   const [viewDate, setViewDate] = useState(() => selectedDate ?? new Date());
   const [time, setTime] = useState(() => parsePickerTime(value));
   const [customText, setCustomText] = useState("");
+  const [customHint, setCustomHint] = useState("");
+  const [activeQuick, setActiveQuick] = useState<(typeof QUICK_OPTIONS)[number] | "">("");
 
   useEffect(() => {
     setTime(parsePickerTime(value));
     const next = parsePickerDate(value);
     if (next) setViewDate(next);
   }, [value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const matchedQuick = getQuickMatchLabel(selectedDate);
+    setActiveQuick(matchedQuick && QUICK_OPTION_SET.has(matchedQuick) ? matchedQuick : "");
+    setCustomHint("");
+    setCustomText(selectedDate ? formatInputByMode(selectedDate, includeTime, time) : "");
+  }, [open, selectedDate, includeTime, time]);
 
   useEffect(() => {
     if (!open) return;
@@ -50,11 +61,13 @@ export function DateTimePicker({
   const min = parsePickerDate(minDate ?? "");
   const max = parsePickerDate(maxDate ?? "");
 
-  const commitDate = (date: Date, nextTime = time) => {
+  const commitDate = (date: Date, nextTime = time, options?: { closeOnCommit?: boolean }) => {
     if (isDateDisabled(date, min, max)) return;
     const datePart = formatInputDate(date);
     onChange(includeTime ? `${datePart}T${nextTime || "18:00"}` : datePart);
-    setOpen(false);
+    setCustomHint("");
+    setCustomText(formatInputByMode(date, includeTime, nextTime));
+    if (options?.closeOnCommit ?? true) setOpen(false);
   };
 
   const shiftMonth = (delta: number) => {
@@ -63,18 +76,37 @@ export function DateTimePicker({
 
   const quickSelect = (label: string) => {
     const today = startOfDay(new Date());
-    if (label === "今天") commitDate(today);
-    if (label === "明天") commitDate(addDays(today, 1));
-    if (label === "本周") commitDate(startOfWeek(today));
-    if (label === "下周") commitDate(addDays(startOfWeek(today), 7));
+    setActiveQuick(label as (typeof QUICK_OPTIONS)[number]);
+    if (label === "今天") return commitDate(today);
+    if (label === "明天") return commitDate(addDays(today, 1));
+    if (label === "本周") return commitDate(startOfWeek(today));
+    if (label === "下周") return commitDate(addDays(startOfWeek(today), 7));
   };
 
   const commitCustomDate = (text: string) => {
     const parsed = parseCustomDate(text);
-    if (!parsed) return;
-    if (isDateDisabled(parsed, min, max)) return;
+    if (!text.trim()) {
+      setCustomHint("");
+      return;
+    }
+    if (!parsed) {
+      setCustomHint("未识别到有效日期，请尝试 YYYY/MM/DD");
+      return;
+    }
+    if (isDateDisabled(parsed, min, max)) {
+      setCustomHint("该日期超出可选范围");
+      return;
+    }
     setViewDate(parsed);
-    commitDate(parsed);
+    setActiveQuick("自定义");
+    commitDate(parsed, time, { closeOnCommit: false });
+  };
+
+  const clearValue = () => {
+    onChange("");
+    setCustomText("");
+    setCustomHint("");
+    setActiveQuick("");
   };
 
   return (
@@ -87,26 +119,44 @@ export function DateTimePicker({
         <div className="date-time-popover">
           <aside className="date-time-quick">
             <b>快捷选择</b>
-            {QUICK_OPTIONS.map(label => (
-              <button key={label} type="button" onClick={() => quickSelect(label)}>{label}</button>
+            {QUICK_OPTIONS.filter(label => QUICK_OPTION_SET.has(label)).map(label => (
+              <button
+                key={label}
+                type="button"
+                className={activeQuick === label ? "is-active" : ""}
+                onClick={() => {
+                  if (label === "自定义") {
+                    setActiveQuick("自定义");
+                    setCustomHint("");
+                    return;
+                  }
+                  quickSelect(label);
+                }}
+              >
+                {label}
+              </button>
             ))}
-            <label className="date-time-custom">
-              <span>自定义输入</span>
-              <input
-                value={customText}
-                inputMode="numeric"
-                placeholder="如 20260506"
-                onChange={event => {
-                  const next = event.target.value;
-                  setCustomText(next);
-                  if (parseCustomDate(next)) commitCustomDate(next);
-                }}
-                onKeyDown={event => {
-                  if (event.key === "Enter") commitCustomDate(customText);
-                }}
-                onBlur={() => commitCustomDate(customText)}
-              />
-            </label>
+            {activeQuick === "自定义" && (
+              <label className="date-time-custom">
+                <span>自定义输入</span>
+                <input
+                  value={customText}
+                  inputMode="text"
+                  placeholder="如 20260708 / 2026年7月8日"
+                  onChange={event => {
+                    const next = event.target.value;
+                    setCustomText(next);
+                    setCustomHint("");
+                    if (parseCustomDate(next)) commitCustomDate(next);
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === "Enter") commitCustomDate(customText);
+                  }}
+                  onBlur={() => commitCustomDate(customText)}
+                />
+                {customHint && <small>{customHint}</small>}
+              </label>
+            )}
           </aside>
           <section className="date-time-calendar">
             <div className="date-time-month">
@@ -149,8 +199,11 @@ export function DateTimePicker({
               </label>
             )}
             <div className="date-time-footer">
-              <button type="button" onClick={() => onChange("")}>清除</button>
-              <button type="button" onClick={() => commitDate(new Date())}>今天</button>
+              <button type="button" onClick={clearValue}>清空</button>
+              <div>
+                <button type="button" onClick={() => commitDate(new Date())}>今天</button>
+                <button type="button" onClick={() => setOpen(false)}>关闭</button>
+              </div>
             </div>
           </section>
           <style>{dateTimePickerCss}</style>
@@ -178,12 +231,14 @@ function parsePickerDate(value: string) {
 function parseCustomDate(text: string) {
   const trimmed = text.trim();
   const compact = trimmed.match(/^(\d{4})(\d{2})(\d{2})$/);
-  const separated = trimmed.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
-  const match = compact ?? separated;
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
+  const separated = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  const chinese = trimmed.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日?$/);
+  const monthDay = trimmed.match(/^(\d{1,2})月(\d{1,2})日?$/);
+  const match = compact ?? separated ?? chinese;
+  const year = monthDay ? new Date().getFullYear() : Number(match?.[1]);
+  const month = monthDay ? Number(monthDay[1]) : Number(match?.[2]);
+  const day = monthDay ? Number(monthDay[2]) : Number(match?.[3]);
+  if (!year || !month || !day) return null;
   const parsed = new Date(year, month - 1, day);
   if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null;
   return parsed;
@@ -215,6 +270,20 @@ function formatSlashDate(date: Date) {
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}`;
 }
 
+function formatInputByMode(date: Date, includeTime: boolean, time: string) {
+  return includeTime ? `${formatSlashDate(date)} ${time || "18:00"}` : formatSlashDate(date);
+}
+
+function getQuickMatchLabel(date: Date | null) {
+  if (!date) return "";
+  const today = startOfDay(new Date());
+  if (sameDay(date, today)) return "今天";
+  if (sameDay(date, addDays(today, 1))) return "明天";
+  if (sameDay(date, startOfWeek(today))) return "本周";
+  if (sameDay(date, addDays(startOfWeek(today), 7))) return "下周";
+  return "";
+}
+
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -239,19 +308,20 @@ function pad(value: number) {
 
 const dateTimePickerCss = `
 .date-time-picker { position: relative; width: 100%; }
-.date-time-trigger { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 13px; border: 1px solid #d9dee7; border-radius: 8px; background: #fff; color: #111827; font: inherit; font-size: 14px; font-weight: 850; text-align: left; cursor: pointer; }
-.date-time-trigger.is-open { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+.date-time-trigger { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 13px; border: 1px solid #d9dee7; border-radius: 8px; background: #fff; color: #111827; font: inherit; font-size: 14px; font-weight: 850; text-align: left; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease; }
+.date-time-trigger.is-open { border-color: #161616; box-shadow: 0 0 0 3px rgba(15, 15, 15, .08); }
 .date-time-icon { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 7px; background: #f3f4f6; color: #050505; }
 .date-time-trigger .is-placeholder { color: #8a909d; }
 .date-time-popover { position: absolute; top: calc(100% + 8px); left: 0; z-index: 300; display: grid; grid-template-columns: 128px 1fr; width: min(520px, calc(100vw - 48px)); border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 20px 60px rgba(15,23,42,.18); overflow: hidden; }
 .date-time-quick { display: flex; flex-direction: column; gap: 2px; padding: 20px 14px; border-right: 1px solid #eef0f4; }
 .date-time-quick b { margin-bottom: 8px; color: #6b7280; font-size: 13px; font-weight: 850; }
-.date-time-quick button { height: 32px; padding: 0 4px; border: 0; border-left: 3px solid transparent; background: transparent; color: #111827; font-size: 14px; font-weight: 800; text-align: left; cursor: pointer; }
-.date-time-quick button:hover { border-left-color: #1f6feb; color: #1f6feb; }
+.date-time-quick button { height: 32px; padding: 0 4px; border: 0; border-left: 3px solid transparent; background: transparent; color: #4b5563; font-size: 14px; font-weight: 800; text-align: left; cursor: pointer; transition: color .18s ease, border-color .18s ease; }
+.date-time-quick button:hover,.date-time-quick button.is-active { border-left-color: #111111; color: #111111; }
 .date-time-custom { display: grid; gap: 7px; margin-top: 10px; padding-top: 12px; border-top: 1px solid #eef0f4; }
 .date-time-custom span { color: #6b7280; font-size: 12px; font-weight: 850; }
-.date-time-custom input { width: 100%; height: 32px; border: 1px solid #d9dee7; border-radius: 8px; padding: 0 9px; color: #111827; font-size: 13px; font-weight: 850; outline: none; }
-.date-time-custom input:focus { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+.date-time-custom input { width: 100%; height: 32px; border: 1px solid #d9dee7; border-radius: 8px; padding: 0 9px; color: #111827; font-size: 13px; font-weight: 850; outline: none; transition: border-color .18s ease, box-shadow .18s ease; }
+.date-time-custom input:focus { border-color: #161616; box-shadow: 0 0 0 3px rgba(15, 15, 15, .08); }
+.date-time-custom small { color: #f97316; font-size: 11px; line-height: 1.4; }
 .date-time-calendar { padding: 18px 18px 14px; min-width: 0; }
 .date-time-month { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; margin-bottom: 14px; }
 .date-time-month strong { text-align: center; color: #111827; font-size: 16px; font-weight: 950; }
@@ -259,15 +329,18 @@ const dateTimePickerCss = `
 .date-time-month button:hover { background: #f3f4f6; }
 .date-time-weekdays,.date-time-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .date-time-weekdays span { height: 28px; display: grid; place-items: center; color: #4b5563; font-size: 13px; font-weight: 900; }
-.date-time-days button { height: 34px; border: 0; border-radius: 999px; background: transparent; color: #111827; font-size: 14px; font-weight: 850; cursor: pointer; }
-.date-time-days button:hover { background: #eef6ff; }
+.date-time-days button { height: 34px; border: 0; border-radius: 999px; background: transparent; color: #111827; font-size: 14px; font-weight: 850; cursor: pointer; transition: background-color .18s ease, color .18s ease, box-shadow .18s ease; }
+.date-time-days button:hover { background: #f3f4f6; }
 .date-time-days button.is-muted { color: #a1a7b3; }
 .date-time-days button.is-disabled { color: #d1d5db; cursor: not-allowed; text-decoration: line-through; }
 .date-time-days button.is-disabled:hover { background: transparent; }
 .date-time-days button.is-today { box-shadow: inset 0 0 0 1px #9ca3af; }
-.date-time-days button.is-selected { background: #1f6feb; color: #fff; box-shadow: none; }
+.date-time-days button.is-selected { background: #111111; color: #fff; box-shadow: none; }
 .date-time-clock { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eef0f4; color: #4b5563; font-size: 13px; font-weight: 900; }
-.date-time-clock input { height: 34px; border: 1px solid #d9dee7; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 850; }
-.date-time-footer { display: flex; justify-content: space-between; margin-top: 12px; }
-.date-time-footer button { border: 0; background: transparent; color: #1f6feb; font-size: 14px; font-weight: 900; cursor: pointer; }
+.date-time-clock input { height: 34px; border: 1px solid #d9dee7; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 850; outline: none; transition: border-color .18s ease, box-shadow .18s ease; }
+.date-time-clock input:focus { border-color: #161616; box-shadow: 0 0 0 3px rgba(15, 15, 15, .08); }
+.date-time-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.date-time-footer > div { display: inline-flex; align-items: center; gap: 12px; }
+.date-time-footer button { border: 0; background: transparent; color: #111111; font-size: 14px; font-weight: 900; cursor: pointer; transition: color .18s ease, opacity .18s ease; }
+.date-time-footer button:hover { opacity: .72; }
 `;

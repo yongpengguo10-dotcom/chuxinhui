@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Project } from "../data/projects";
 import { Task } from "../data/tasks";
+import { DateTimePicker } from "../components/DateTimePicker";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { NavKey } from "../components/Sidebar";
 import { isDoneStatus, isOverdue, projectStats } from "../lib/taskUtils";
@@ -27,44 +28,12 @@ interface ProjectOverviewProps {
 }
 
 const COVER_IMAGE = "https://images.unsplash.com/photo-1511818966892-d7d671e672a2?auto=format&fit=crop&q=80&w=1200";
-const HEADER_AVATAR = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200";
 const MEMBER_AVATARS = [
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
   "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=200",
   "https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&q=80&w=200",
   "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
 ];
-
-const NAV_ITEMS: { label: string; key?: NavKey; opensProjectMenu?: boolean }[] = [
-  { label: "概览", key: "overview" },
-  { label: "项目", opensProjectMenu: true },
-  { label: "任务", key: "control.board" },
-  { label: "资源库", key: "library.project-images" },
-  { label: "团队", key: "library.people" },
-  { label: "报告", key: "ai.report" },
-];
-
-const MILESTONES = [
-  { title: "宣传方案确认", date: "05-15", state: "已完成" },
-  { title: "主视觉设计", date: "05-16", state: "已完成" },
-  { title: "物料制作", date: "05-16", state: "进行中" },
-  { title: "宣传发布", date: "05-21", state: "未开始" },
-  { title: "活动开始", date: "05-22", state: "未开始" },
-] as const;
-
-const DISTRIBUTION_ROWS = [
-  { label: "已完成", value: 1, pct: "33%", tone: "green" },
-  { label: "进行中", value: 1, pct: "33%", tone: "orange" },
-  { label: "待审核", value: 1, pct: "33%", tone: "yellow" },
-  { label: "已逾期", value: 0, pct: "0%", tone: "red" },
-  { label: "未开始", value: 0, pct: "0%", tone: "gray" },
-] as const;
-
-const OWNER_ROWS = [
-  { initial: "李", name: "李娜（招商）", ratio: "0/1", fill: 0 },
-  { initial: "刘", name: "刘洋（设计）", ratio: "1/1", fill: 1 },
-  { initial: "苏", name: "苏婉（文案）", ratio: "0/1", fill: 0 },
-] as const;
 
 export function ProjectOverview({
   projects,
@@ -75,25 +44,19 @@ export function ProjectOverview({
   onCreateProject,
   onUpdateProject,
   canCreateProject,
-  currentRole,
+  createProjectRequest,
   onNavigate,
   showToast,
 }: ProjectOverviewProps) {
-  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [coverReplaceOpen, setCoverReplaceOpen] = useState(false);
-  const projectMenuRef = useRef<HTMLDivElement>(null);
+  const [selectedChainTaskId, setSelectedChainTaskId] = useState<string | null>(null);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (!projectMenuOpen) return;
-    const handleMouseDown = (event: MouseEvent) => {
-      if (projectMenuRef.current && !projectMenuRef.current.contains(event.target as Node)) {
-        setProjectMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [projectMenuOpen]);
+    if (!createProjectRequest) return;
+    setCreateModalOpen(true);
+  }, [createProjectRequest]);
 
   const selectedProject = useMemo(() => {
     return projects.find(project => project.id === currentProject.id) ?? currentProject;
@@ -117,6 +80,19 @@ export function ProjectOverview({
     return deadline - now <= 12 * 60 * 60 * 1000;
   }).length;
   const pendingCount = Math.max(0, projectTasks.filter(task => !isDoneStatus(task.status)).length);
+  const countdown = useMemo(() => getCountdownState(selectedProject.date), [selectedProject.date]);
+  const nearDueTasks = useMemo(() => {
+    return projectTasks
+      .filter(task => !isDoneStatus(task.status))
+      .filter(task => getDaysUntilDeadline(task.deadline) === 1)
+      .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+      .slice(0, 4);
+  }, [projectTasks]);
+  const progressOverview = useMemo(() => getProjectProgressOverview(projectTasks), [projectTasks]);
+  const selectedChainTask = useMemo(
+    () => projectTasks.find(task => task.id === selectedChainTaskId) ?? null,
+    [projectTasks, selectedChainTaskId],
+  );
   const metrics = [
     {
       icon: "fi fi-rr-badge-check",
@@ -156,50 +132,6 @@ export function ProjectOverview({
     <main className="overview-homepage">
       <style>{overviewCss}</style>
 
-      <header className="overview-header">
-        <div className="overview-header-brand">
-          <span className="brand-logo"></span>
-          <strong>项目总览</strong>
-        </div>
-
-        <nav className="overview-header-nav" aria-label="顶部导航">
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.label}
-              type="button"
-              className={item.label === "概览" ? "is-active" : ""}
-              onClick={() => {
-                if (item.opensProjectMenu) {
-                  setProjectMenuOpen(prev => !prev);
-                  return;
-                }
-                if (item.key) onNavigate(item.key);
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="overview-header-actions">
-          <button type="button" className="header-icon-button" aria-label="搜索">
-            <Flaticon name="fi fi-rr-search" />
-          </button>
-          <button type="button" className="header-icon-button has-badge" aria-label="通知">
-            <Flaticon name="fi fi-rr-bell" />
-          </button>
-          <div className="header-user-avatar">
-            <ImageWithFallback src={HEADER_AVATAR} alt="用户头像" />
-          </div>
-          {canCreateProject && (
-            <button type="button" className="header-create-button" onClick={() => setCreateModalOpen(true)}>
-              <Flaticon name="fi fi-rr-plus" />
-              创建项目
-            </button>
-          )}
-        </div>
-      </header>
-
       <div className="overview-canvas">
         <section className="overview-content">
           <aside className="overview-left-panel">
@@ -207,14 +139,9 @@ export function ProjectOverview({
               <div className="poster-image-wrap">
                 <ImageWithFallback src={selectedProject.coverUrl || COVER_IMAGE} alt={selectedProject.fullName} />
               </div>
-              <div className="poster-card-footer">
-                <span>项目海报预览</span>
-                <span className="poster-expand-icon">⤢</span>
-              </div>
             </button>
 
             <span className="phase-chip">{selectedProject.phase}</span>
-            <h1 className="project-title">{selectedProject.fullName}</h1>
             <p className="project-copy">
               {selectedProject.notes || `${selectedProject.fullName}项目内部主页，集中查看项目资料、最新素材和当前协作进度。`}
             </p>
@@ -276,8 +203,7 @@ export function ProjectOverview({
                   )}
                 </div>
 
-                <p className="hero-eyebrow">{currentRole || "管理"}视角</p>
-                <h2 className="hero-title">高效协同，驱动招商成功</h2>
+                <h2 className="hero-title">{selectedProject.fullName}</h2>
                 <p className="hero-description">当前项目有 {pendingCount} 个与你相关的待处理任务</p>
 
                 <div className="hero-actions">
@@ -294,15 +220,25 @@ export function ProjectOverview({
 
               <div className="hero-right">
                 <div className="countdown-shell">
-                  <svg viewBox="0 0 200 200" aria-hidden="true">
-                    <circle className="countdown-base" cx="100" cy="100" r="78" />
-                    <circle className="countdown-active" cx="100" cy="100" r="78" />
-                  </svg>
-                  <div className="countdown-copy">
-                    <span>距离活动开始</span>
-                    <strong>0</strong>
-                    <em>天</em>
-                    <b>今天开始</b>
+                  <div className="countdown-ring">
+                    <svg viewBox="0 0 200 200" aria-hidden="true">
+                      <circle className="countdown-base" cx="100" cy="100" r="88" />
+                      <circle
+                        className="countdown-active"
+                        cx="100"
+                        cy="100"
+                        r="88"
+                        style={{
+                          strokeDasharray: `${countdown.circumference}`,
+                          strokeDashoffset: `${countdown.offset}`,
+                        }}
+                      />
+                    </svg>
+                    <div className="countdown-copy">
+                      <span className="countdown-top-label">{countdown.title}</span>
+                      <strong>{countdown.daysLeft}</strong>
+                      <em>天</em>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -311,7 +247,19 @@ export function ProjectOverview({
             <section className="overview-metric-strip">
               {metrics.map(item => {
                 return (
-                  <article key={item.label} className="overview-metric-item">
+                  <article
+                    key={item.label}
+                    className="overview-metric-item"
+                    role={item.label === "整体完成度" ? "button" : undefined}
+                    tabIndex={item.label === "整体完成度" ? 0 : undefined}
+                    onClick={item.label === "整体完成度" ? () => setProgressDialogOpen(true) : undefined}
+                    onKeyDown={item.label === "整体完成度" ? event => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setProgressDialogOpen(true);
+                      }
+                    } : undefined}
+                  >
                     <div className="overview-metric-heading">
                       <span className={`overview-metric-icon tone-${item.tone}`}>
                         <Flaticon name={item.icon} />
@@ -329,72 +277,40 @@ export function ProjectOverview({
             </section>
 
             <section className="panel-row">
-              <article className="info-panel milestone-panel">
-                <h3>项目进度里程碑</h3>
-                <div className="milestone-timeline">
-                  {MILESTONES.map((item, index) => {
-                    const done = item.state === "已完成";
-                    const active = item.state === "进行中";
-                    return (
-                      <div key={`${item.title}-${item.date}`} className="milestone-item">
-                        <div className={`milestone-node ${done ? "done" : ""} ${active ? "active" : ""}`}>
-                          {done ? "✓" : active ? "!" : ""}
-                        </div>
-                        {index < MILESTONES.length - 1 && <div className="milestone-connector" />}
-                        <strong>{item.title}</strong>
-                        <span>{item.date}</span>
-                        <em className={active ? "active" : ""}>{item.state}</em>
-                      </div>
-                    );
-                  })}
-                </div>
-              </article>
-
-              <article className="info-panel donut-panel">
-                <h3>任务状态分布</h3>
-                <div className="donut-panel-body">
-                  <div className="donut-chart">
-                    <div className="donut-center">
-                      <span>总任务</span>
-                      <strong>3</strong>
-                    </div>
-                  </div>
-
-                  <div className="distribution-list">
-                    {DISTRIBUTION_ROWS.map(row => (
-                      <div key={row.label} className="distribution-row">
-                        <div className="distribution-label">
-                          <span className={`distribution-dot tone-${row.tone}`} />
-                          <span>{row.label}</span>
-                        </div>
-                        <b>{row.value}</b>
-                        <em>{row.pct}</em>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </article>
-
               <article className="info-panel owner-panel">
-                <h3>任务负责人 TOP5</h3>
-                <div className="owner-list">
-                  {OWNER_ROWS.map(row => (
-                    <div key={row.name} className="owner-row">
-                      <div className="owner-person">
-                        <span className="owner-badge">{row.initial}</span>
-                        <span className="owner-name">{row.name}</span>
-                      </div>
-                      <div className="owner-bar">
-                        <i style={{ width: `${row.fill * 100}%`, background: row.fill > 0 ? "#111827" : "transparent" }} />
-                      </div>
-                      <strong>{row.ratio}</strong>
-                    </div>
-                  ))}
-
+                <div className="owner-panel-header">
+                  <h3>临期任务</h3>
                   <button type="button" className="owner-more-link" onClick={() => onNavigate("control.board")}>
                     查看更多任务
                     <Flaticon name="fi fi-rr-arrow-right" />
                   </button>
+                </div>
+                <div className="task-card-grid">
+                  {nearDueTasks.length > 0 ? nearDueTasks.map(task => (
+                    <article key={task.id} className="task-card" onClick={() => setSelectedChainTaskId(task.id)} role="button" tabIndex={0}>
+                      <div className="task-card-head">
+                        <span className="task-card-alert">
+                          <Flaticon name={getTaskStatusIcon(task.status)} />
+                        </span>
+                        <span className={`task-card-status status-${getTaskStatusTone(task.status)}`}>{task.status}</span>
+                      </div>
+                      <strong className="task-card-title">{task.name}</strong>
+                      <span className="task-card-meta">{task.role} · {task.owner}</span>
+                      {getBlockingRole(task, projectTasks) ? (
+                        <div className="task-card-blocker">
+                          <span>当前阻塞岗位</span>
+                          <b>{getBlockingRole(task, projectTasks)}</b>
+                        </div>
+                      ) : (
+                        <div className="task-card-blocker">
+                          <span>剩余时间</span>
+                          <b>1 天</b>
+                        </div>
+                      )}
+                    </article>
+                  )) : (
+                    <div className="active-task-empty">当前没有临期任务</div>
+                  )}
                 </div>
               </article>
             </section>
@@ -427,6 +343,21 @@ export function ProjectOverview({
             setCoverReplaceOpen(false);
             showToast("项目封面已替换");
           }}
+        />
+      )}
+
+      {selectedChainTask && (
+        <TaskChainDialog
+          currentTask={selectedChainTask}
+          projectTasks={projectTasks}
+          onClose={() => setSelectedChainTaskId(null)}
+        />
+      )}
+
+      {progressDialogOpen && (
+        <ProgressLagDialog
+          overview={progressOverview}
+          onClose={() => setProgressDialogOpen(false)}
         />
       )}
     </main>
@@ -928,6 +859,182 @@ function CoverReplaceDialog({
   );
 }
 
+function TaskChainDialog({
+  currentTask,
+  projectTasks,
+  onClose,
+}: {
+  currentTask: Task;
+  projectTasks: Task[];
+  onClose: () => void;
+}) {
+  const chain = useMemo(() => buildTaskChain(currentTask, projectTasks), [currentTask, projectTasks]);
+  const currentIndex = chain.steps.findIndex(step => step.id === currentTask.id);
+  const blockedIndex = chain.steps.findIndex(step => step.id === chain.blockedTaskId);
+  const activeIndex = blockedIndex >= 0 ? blockedIndex : currentIndex;
+  const progressPct = chain.steps.length > 1 ? (activeIndex / (chain.steps.length - 1)) * 100 : 100;
+
+  return (
+    <div className="task-chain-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="task-chain-dialog" role="dialog" aria-modal="true" aria-labelledby="task-chain-title" onMouseDown={event => event.stopPropagation()}>
+        <header className="task-chain-header">
+          <div>
+            <h2 id="task-chain-title">{chain.title}</h2>
+            <p>
+              当前卡在第 {Math.max(1, blockedIndex >= 0 ? blockedIndex + 1 : currentIndex + 1)} 步 / 共 {chain.steps.length} 步：
+              {chain.steps[blockedIndex >= 0 ? blockedIndex : currentIndex]?.role ?? currentTask.role}
+            </p>
+          </div>
+          <button type="button" className="task-chain-close" onClick={onClose} aria-label="关闭">
+            <Flaticon name="fi fi-rr-cross-small" />
+          </button>
+        </header>
+
+        <div className="task-chain-body">
+          {chain.steps.length > 0 ? (
+            <>
+              <div className="task-chain-flow" style={{ ["--task-chain-count" as string]: chain.steps.length }}>
+                <div className="task-chain-steps" style={{ gridTemplateColumns: `repeat(${chain.steps.length}, minmax(0, 1fr))` }}>
+                {chain.steps.map((step, index) => {
+                  const isCurrent = step.id === currentTask.id;
+                  const isBlocked = chain.blockedTaskId === step.id;
+                  const displayStatus = getChainDisplayStatus(step, projectTasks);
+                  return (
+                    <div key={step.id} className={isCurrent ? "task-step-card is-current" : "task-step-card"}>
+                      <div className="task-step-head">
+                        <span className="task-step-index">{index + 1}</span>
+                        <div className="task-step-role-wrap">
+                          <span className="task-step-role">{step.role}</span>
+                          {isCurrent && <span className="task-step-current-tag">当前任务</span>}
+                        </div>
+                        {isBlocked && <span className="task-step-dot" />}
+                      </div>
+                      <strong className="task-step-title">{step.name}</strong>
+                      <span className="task-step-meta">{step.owner} · 截止 {formatMonthDay(step.deadline)}</span>
+                      <span className={`task-step-status status-${getTaskStatusTone(displayStatus)}`}>{displayStatus}</span>
+                    </div>
+                  );
+                })}
+                </div>
+
+                <div className="task-chain-progress">
+                  <div className="task-chain-progress-track">
+                    <i style={{ width: `${progressPct}%` }} />
+                  </div>
+                  <div className="task-chain-progress-dots" style={{ gridTemplateColumns: `repeat(${chain.steps.length}, minmax(0, 1fr))` }}>
+                    {chain.steps.map((step, index) => (
+                      <span
+                        key={step.id}
+                        className={[
+                          index < activeIndex ? "is-done" : "",
+                          index === activeIndex ? "is-active" : "",
+                        ].filter(Boolean).join(" ")}
+                      >
+                        {index + 1}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="task-chain-empty">当前任务暂无完整任务链数据</div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ProgressLagDialog({
+  overview,
+  onClose,
+}: {
+  overview: ReturnType<typeof getProjectProgressOverview>;
+  onClose: () => void;
+}) {
+  return (
+    <div className="progress-dialog-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="progress-dialog" role="dialog" aria-modal="true" aria-labelledby="progress-dialog-title" onMouseDown={event => event.stopPropagation()}>
+        <header className="progress-dialog-header">
+          <div className="progress-dialog-title-wrap">
+            <span className="progress-dialog-icon">
+              <Flaticon name="fi fi-rr-time-forward" />
+            </span>
+            <div>
+              <h2 id="progress-dialog-title">整体完成进度滞后</h2>
+              <p>当前整体完成进度滞后于计划，请及时关注未完成的任务并推进执行。</p>
+            </div>
+          </div>
+          <button type="button" className="progress-dialog-close" onClick={onClose} aria-label="关闭">
+            <Flaticon name="fi fi-rr-cross-small" />
+          </button>
+        </header>
+
+        <div className="progress-dialog-body">
+          <section className="progress-overview-card">
+            <div className="progress-overview-main">
+              <div>
+                <span>整体完成进度</span>
+                <strong>{overview.actualPct}%</strong>
+                <em>{overview.doneCount}/{overview.totalCount} 任务完成</em>
+              </div>
+              <div>
+                <span>计划进度</span>
+                <strong>{overview.planPct}%</strong>
+                <em>{overview.plannedDoneCount}/{overview.totalCount} 计划节点</em>
+              </div>
+              <div className="lag-column">
+                <span>滞后</span>
+                <strong>{overview.lagPct}%</strong>
+              </div>
+            </div>
+            <div className="progress-overview-track">
+              <i className="planned" style={{ width: `${overview.planPct}%` }} />
+              <i className="actual" style={{ width: `${overview.actualPct}%` }} />
+            </div>
+          </section>
+
+          <section className="progress-task-section">
+            <h3><span className="done-dot" /> 已完成任务 ({overview.completedTasks.length})</h3>
+            <div className="progress-task-list">
+              {overview.completedTasks.map(task => (
+                <article key={task.id} className="progress-task-row">
+                  <div className="progress-task-main">
+                    <strong>{task.name}</strong>
+                    <span>{task.role} · {task.owner}</span>
+                  </div>
+                  <span className="progress-task-time">完成时间：{formatFullDate(task.doneAt || task.deadline)}</span>
+                  <span className="progress-task-tag done">已完成</span>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="progress-task-section">
+            <h3><span className="todo-dot" /> 未完成任务 ({overview.pendingTasks.length})</h3>
+            <div className="progress-task-list">
+              {overview.pendingTasks.map(task => {
+                const pendingLabel = getPendingTaskLabel(task.deadline);
+                return (
+                  <article key={task.id} className="progress-task-row">
+                    <div className="progress-task-main">
+                      <strong>{task.name}</strong>
+                      <span>{task.role} · {task.owner}</span>
+                    </div>
+                    <span className="progress-task-time">计划完成：{formatFullDate(task.deadline)}</span>
+                    <span className={`progress-task-tag ${pendingLabel.tone}`}>{pendingLabel.label}</span>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function AssetPickerDialog({
   images,
   selectedUrl,
@@ -1105,7 +1212,9 @@ function DateInput({ label, value, onChange }: { label: string; value: string; o
   return (
     <label className="date-input">
       <Flaticon name="fi fi-rr-calendar" />
-      <input type="date" value={value} onChange={event => onChange(event.target.value)} aria-label={label} />
+      <div className="date-input-picker">
+        <DateTimePicker value={value} onChange={onChange} placeholder="年 / 月 / 日" />
+      </div>
     </label>
   );
 }
@@ -1133,6 +1242,210 @@ function getRecruitmentMetric(projectTasks: Task[], goals: string) {
     confirmed: Math.round((target * pct) / 100),
     pct,
   };
+}
+
+function getCountdownState(date: string) {
+  const targetDate = new Date(date);
+  const today = new Date();
+  targetDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+
+  const diffMs = targetDate.getTime() - today.getTime();
+  const daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  const windowDays = 30;
+  const progress = Math.max(0, Math.min(1, (windowDays - Math.min(daysLeft, windowDays)) / windowDays));
+  const radius = 88;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - progress);
+
+  return {
+    daysLeft,
+    title: "距离活动开始",
+    circumference,
+    offset,
+  };
+}
+
+function formatMonthDay(date: string) {
+  const [, month, day] = date.split("-");
+  return `${month}-${day}`;
+}
+
+function getPriorityTone(priority: Task["priority"]) {
+  if (priority === "紧急") return "high";
+  if (priority === "重要") return "medium";
+  return "normal";
+}
+
+function getDaysUntilDeadline(deadline: string) {
+  const target = new Date(deadline);
+  const today = new Date();
+  target.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getTaskStatusTone(status: Task["status"]) {
+  if (status === "有风险" || status === "已逾期") return "risk";
+  if (status === "待审核") return "review";
+  if (status === "等待前置任务") return "blocked";
+  if (status === "进行中") return "active";
+  return "default";
+}
+
+function getTaskStatusIcon(status: Task["status"]) {
+  if (status === "有风险" || status === "已逾期") return "fi fi-rr-triangle-warning";
+  if (status === "待审核") return "fi fi-rr-clipboard-check";
+  if (status === "等待前置任务") return "fi fi-rr-ban";
+  return "fi fi-rr-time-forward";
+}
+
+function getBlockingRole(task: Task, projectTasks: Task[]) {
+  if (!task.dependencyIds?.length) return "";
+  const dependency = projectTasks.find(item => task.dependencyIds?.includes(item.id));
+  return dependency?.role ?? "";
+}
+
+function buildTaskChain(currentTask: Task, projectTasks: Task[]) {
+  const grouped = currentTask.taskGroupId
+    ? projectTasks.filter(task => task.taskGroupId === currentTask.taskGroupId)
+    : projectTasks.filter(task =>
+      task.id === currentTask.id
+      || currentTask.dependencyIds?.includes(task.id)
+      || task.dependencyIds?.includes(currentTask.id)
+      || currentTask.linkedTaskIds?.includes(task.id)
+      || task.linkedTaskIds?.includes(currentTask.id),
+    );
+
+  const uniqueSteps = Array.from(new Map(grouped.map(task => [task.id, task])).values());
+  const steps = sortTasksByChain(uniqueSteps);
+  const blockedTask = findBlockedTask(steps, projectTasks);
+
+  return {
+    title: currentTask.taskGroupId ? `任务链详情 · ${currentTask.name}` : `任务链详情`,
+    steps: steps.length > 0 ? steps : [currentTask],
+    blockedTaskId: blockedTask?.id ?? "",
+  };
+}
+
+function sortTasksByChain(tasks: Task[]) {
+  if (tasks.length <= 1) return tasks;
+
+  const byId = new Map(tasks.map(task => [task.id, task]));
+  const incomingCount = new Map<string, number>(tasks.map(task => [task.id, 0]));
+  const adjacency = new Map<string, Task[]>(tasks.map(task => [task.id, []]));
+
+  for (const task of tasks) {
+    for (const depId of task.dependencyIds ?? []) {
+      if (!byId.has(depId)) continue;
+      adjacency.get(depId)?.push(task);
+      incomingCount.set(task.id, (incomingCount.get(task.id) ?? 0) + 1);
+    }
+  }
+
+  const queue = tasks
+    .filter(task => (incomingCount.get(task.id) ?? 0) === 0)
+    .sort(compareTaskFlowOrder);
+  const sorted: Task[] = [];
+
+  while (queue.length > 0) {
+    const task = queue.shift()!;
+    sorted.push(task);
+    for (const nextTask of adjacency.get(task.id) ?? []) {
+      const nextCount = (incomingCount.get(nextTask.id) ?? 1) - 1;
+      incomingCount.set(nextTask.id, nextCount);
+      if (nextCount === 0) {
+        queue.push(nextTask);
+        queue.sort(compareTaskFlowOrder);
+      }
+    }
+  }
+
+  const missing = tasks.filter(task => !sorted.find(item => item.id === task.id)).sort(compareTaskFlowOrder);
+  return [...sorted, ...missing];
+}
+
+function compareTaskFlowOrder(a: Task, b: Task) {
+  const roleOrder = getFlowRoleOrder();
+  const roleDiff = roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role);
+  if (roleDiff !== 0) return roleDiff;
+  const deadlineDiff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+  if (deadlineDiff !== 0) return deadlineDiff;
+  return a.name.localeCompare(b.name, "zh-CN");
+}
+
+function getFlowRoleOrder() {
+  return ["文案", "现场执行", "设计", "审核", "运营", "招商", "短视频", "客服"] as const;
+}
+
+function findBlockedTask(steps: Task[], projectTasks: Task[]) {
+  for (const step of steps) {
+    const dependency = (step.dependencyIds ?? [])
+      .map(id => projectTasks.find(task => task.id === id))
+      .find(Boolean);
+
+    if (dependency && !isDoneStatus(dependency.status) && dependency.status !== "已定稿") {
+      return dependency;
+    }
+
+    if (step.status === "等待前置任务") {
+      return step;
+    }
+  }
+
+  return null;
+}
+
+function getChainDisplayStatus(task: Task, projectTasks: Task[]) {
+  const dependencies = (task.dependencyIds ?? [])
+    .map(id => projectTasks.find(item => item.id === id))
+    .filter((item): item is Task => Boolean(item));
+
+  const hasPendingDependency = dependencies.some(dep => !isDoneStatus(dep.status) && dep.status !== "已定稿");
+  if (hasPendingDependency) return "等待前置任务" as const;
+  return task.status;
+}
+
+function getProjectProgressOverview(projectTasks: Task[]) {
+  const totalCount = projectTasks.length;
+  const doneTasks = projectTasks.filter(task => isDoneStatus(task.status));
+  const pendingTasks = projectTasks.filter(task => !isDoneStatus(task.status));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const plannedDoneCount = projectTasks.filter(task => {
+    const deadline = new Date(task.deadline);
+    deadline.setHours(0, 0, 0, 0);
+    return deadline.getTime() <= today.getTime();
+  }).length;
+
+  const actualPct = totalCount ? Math.round((doneTasks.length / totalCount) * 100) : 0;
+  const planPct = totalCount ? Math.round((plannedDoneCount / totalCount) * 100) : 0;
+  const lagPct = Math.max(0, planPct - actualPct);
+
+  return {
+    actualPct,
+    planPct,
+    lagPct,
+    doneCount: doneTasks.length,
+    totalCount,
+    plannedDoneCount,
+    completedTasks: doneTasks.slice().sort((a, b) => new Date(b.reviewedAt || b.submittedAt || b.deadline).getTime() - new Date(a.reviewedAt || a.submittedAt || a.deadline).getTime()),
+    pendingTasks: pendingTasks.slice().sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()),
+  };
+}
+
+function formatFullDate(date: string) {
+  const [year, month, day] = date.split("-");
+  return `${year}-${month}-${day}`;
+}
+
+function getPendingTaskLabel(deadline: string) {
+  const days = getDaysUntilDeadline(deadline);
+  if (days < 0) return { label: `已逾期 ${Math.abs(days)} 天`, tone: "overdue" };
+  if (days === 0) return { label: "今日到期", tone: "soon" };
+  if (days <= 3) return { label: `剩余 ${days} 天`, tone: "soon" };
+  return { label: `剩余 ${days} 天`, tone: "normal" };
 }
 
 function extractTargetPeople(goals: string) {
@@ -1378,22 +1691,6 @@ const overviewCss = `
     object-fit: cover;
   }
 
-  .poster-card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 48px;
-    padding: 0 16px;
-    color: #111827;
-    font-size: 15px;
-    font-weight: 600;
-  }
-
-  .poster-expand-icon {
-    font-size: 18px;
-    line-height: 1;
-  }
-
   .phase-chip {
     display: inline-flex;
     align-items: center;
@@ -1408,17 +1705,8 @@ const overviewCss = `
     font-weight: 600;
   }
 
-  .project-title {
-    margin: 16px 0 14px;
-    color: #111827;
-    font-size: 28px;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.03em;
-  }
-
   .project-copy {
-    margin: 0;
+    margin: 16px 0 0;
     color: #4b5563;
     font-size: 15px;
     line-height: 1.85;
@@ -1597,15 +1885,8 @@ const overviewCss = `
     font-size: 12px;
   }
 
-  .hero-eyebrow {
-    margin: 24px 0 16px;
-    color: #374151;
-    font-size: 16px;
-    font-weight: 600;
-  }
-
   .hero-title {
-    margin: 0;
+    margin: 24px 0 0;
     color: #111827;
     font-size: clamp(42px, 3.2vw, 60px);
     font-weight: 800;
@@ -1659,25 +1940,32 @@ const overviewCss = `
   .hero-right {
     display: flex;
     justify-content: center;
-    padding-top: 22px;
+    padding-top: 8px;
   }
 
   .countdown-shell {
+    display: grid;
+    justify-items: center;
+    width: 200px;
+    gap: 16px;
+  }
+
+  .countdown-ring {
     position: relative;
-    width: clamp(170px, 13vw, 200px);
-    height: clamp(170px, 13vw, 200px);
+    width: 200px;
+    height: 200px;
   }
 
   .countdown-shell svg {
-    width: 100%;
-    height: 100%;
-    transform: rotate(-132deg);
+    width: 200px;
+    height: 200px;
+    transform: rotate(-90deg);
   }
 
   .countdown-base,
   .countdown-active {
     fill: none;
-    stroke-width: 6;
+    stroke-width: 12;
     stroke-linecap: round;
   }
 
@@ -1687,50 +1975,48 @@ const overviewCss = `
 
   .countdown-active {
     stroke: #111827;
-    stroke-dasharray: 490;
-    stroke-dashoffset: 122;
+    transition: stroke-dashoffset 220ms ease;
   }
 
   .countdown-copy {
     position: absolute;
-    inset: 0;
+    left: 50%;
+    top: 50%;
+    width: 120px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    transform: translate(-50%, -50%);
     text-align: center;
   }
 
-  .countdown-copy span,
-  .countdown-copy em,
-  .countdown-copy b {
+  .countdown-top-label,
+  .countdown-copy em {
     color: #374151;
   }
 
-  .countdown-copy span {
+  .countdown-top-label {
+    margin-bottom: 8px;
     font-size: 14px;
     font-weight: 500;
+    line-height: 1.3;
   }
 
   .countdown-copy strong {
-    margin-top: 8px;
     color: #111827;
-    font-size: clamp(54px, 4vw, 68px);
+    font-size: 48px;
     font-weight: 700;
     line-height: 1;
-    letter-spacing: -0.06em;
+    letter-spacing: -0.04em;
   }
 
   .countdown-copy em {
-    margin-top: 6px;
-    font-size: 18px;
-    font-style: normal;
-  }
-
-  .countdown-copy b {
-    margin-top: 22px;
-    font-size: 16px;
+    margin-top: 4px;
+    font-size: 14px;
     font-weight: 500;
+    font-style: normal;
+    line-height: 1.2;
   }
 
   .overview-metric-strip {
@@ -1746,6 +2032,18 @@ const overviewCss = `
   .overview-metric-item {
     min-height: 186px;
     padding: 24px clamp(24px, 3vw, 64px) 22px 24px;
+  }
+
+  .overview-metric-item[role="button"] {
+    cursor: pointer;
+    transition: background 160ms ease, box-shadow 160ms ease;
+  }
+
+  .overview-metric-item[role="button"]:hover,
+  .overview-metric-item[role="button"]:focus-visible {
+    background: #fcfcfd;
+    box-shadow: inset 0 0 0 1px #eef1f4;
+    outline: none;
   }
 
   .overview-metric-item + .overview-metric-item {
@@ -1833,10 +2131,35 @@ const overviewCss = `
     color: #4b5563;
   }
 
+  .tone-blue {
+    background: #1677ff;
+    color: #1677ff;
+  }
+
+  .tone-green {
+    background: #16a34a;
+    color: #16a34a;
+  }
+
+  .tone-orange {
+    background: #ff8a1f;
+    color: #ff8a1f;
+  }
+
+  .tone-red {
+    background: #ef4444;
+    color: #ef4444;
+  }
+
+  .overview-metric-icon.tone-blue,
+  .overview-metric-icon.tone-green,
+  .overview-metric-icon.tone-orange,
+  .overview-metric-icon.tone-red {
+    color: #ffffff;
+  }
+
   .panel-row {
-    display: grid;
-    grid-template-columns: minmax(360px, 1.05fr) minmax(320px, 0.95fr) minmax(300px, 0.9fr);
-    gap: 24px;
+    display: block;
     margin-top: 24px;
   }
 
@@ -1849,235 +2172,153 @@ const overviewCss = `
   }
 
   .info-panel h3 {
-    margin: 0 0 24px;
+    margin: 0;
     color: #111827;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  .milestone-timeline {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0;
-  }
-
-  .milestone-item {
-    position: relative;
-    text-align: center;
-  }
-
-  .milestone-node {
-    position: relative;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: 2px solid #d1d5db;
-    border-radius: 50%;
-    background: #ffffff;
-    color: #111827;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  .milestone-node.done,
-  .milestone-node.active {
-    border-color: #111827;
-    background: #111827;
-    color: #ffffff;
-  }
-
-  .milestone-connector {
-    position: absolute;
-    top: 13px;
-    left: calc(50% + 14px);
-    width: calc(100% - 10px);
-    height: 2px;
-    background: #d1d5db;
-  }
-
-  .milestone-item strong,
-  .milestone-item span,
-  .milestone-item em {
-    display: block;
-  }
-
-  .milestone-item strong {
-    margin-top: 16px;
-    color: #374151;
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 600;
-    line-height: 1.5;
-  }
-
-  .milestone-item span {
-    margin-top: 12px;
-    color: #6b7280;
-    font-size: 12px;
-  }
-
-  .milestone-item em {
-    width: fit-content;
-    margin: 12px auto 0;
-    padding: 4px 10px;
-    border-radius: 8px;
-    background: #f3f4f6;
-    color: #374151;
-    font-size: 12px;
-    font-style: normal;
-  }
-
-  .milestone-item em.active {
-    border: 1px solid #111827;
-    background: #ffffff;
-  }
-
-  .donut-panel-body {
-    display: grid;
-    grid-template-columns: minmax(130px, 164px) minmax(0, 1fr);
-    gap: 20px;
-    align-items: center;
-  }
-
-  .donut-chart {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: clamp(118px, 8vw, 144px);
-    height: clamp(118px, 8vw, 144px);
-    border-radius: 50%;
-    background: conic-gradient(#16a34a 0deg 120deg, #f59e0b 120deg 240deg, #111827 240deg 360deg);
-  }
-
-  .donut-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 78px;
-    height: 78px;
-    border-radius: 50%;
-    background: #ffffff;
-  }
-
-  .donut-center span {
-    color: #6b7280;
-    font-size: 12px;
-  }
-
-  .donut-center strong {
-    margin-top: 6px;
-    color: #111827;
-    font-size: 24px;
-    font-weight: 700;
-    line-height: 1;
-  }
-
-  .distribution-list {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .distribution-row {
-    display: grid;
-    grid-template-columns: minmax(74px, 1fr) 20px 42px;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .distribution-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #374151;
-    font-size: 15px;
-    white-space: nowrap;
-    word-break: keep-all;
-  }
-
-  .distribution-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .distribution-row b,
-  .distribution-row em {
-    color: #6b7280;
-    font-size: 14px;
-    font-style: normal;
-    text-align: right;
-  }
-
-  .owner-list {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-
-  .owner-row {
-    display: grid;
-    grid-template-columns: minmax(120px, 1fr) minmax(80px, 124px) 34px;
-    align-items: center;
-    gap: 14px;
-  }
-
-  .owner-person {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-  }
-
-  .owner-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
-    background: #f3f4f6;
-    color: #111827;
-    font-size: 14px;
-    font-weight: 700;
-    flex-shrink: 0;
-  }
-
-  .owner-name {
-    color: #374151;
-    font-size: 15px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    letter-spacing: -0.01em;
   }
 
   .info-panel {
     min-width: 0;
   }
 
-  .owner-bar {
-    height: 4px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: #e5e7eb;
+  .owner-panel {
+    min-height: auto;
+    max-height: none;
   }
 
-  .owner-bar i {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
+  .owner-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
   }
 
-  .owner-row strong {
-    color: #111827;
-    font-size: 15px;
+  .task-card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .task-card {
+    min-height: 120px;
+    padding: 16px;
+    border: 1px solid #e9e9ec;
+    border-radius: 12px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+
+  .task-card:hover,
+  .task-card:focus-visible {
+    border-color: #d5d9e2;
+    box-shadow: 0 10px 24px rgba(17, 24, 39, 0.08);
+    transform: translateY(-1px);
+    outline: none;
+  }
+
+  .task-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .task-card-alert {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: #1a1a1a;
+    font-size: 18px;
+  }
+
+  .task-card-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 68px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 12px;
+    font-size: 13px;
     font-weight: 600;
-    text-align: right;
+    white-space: nowrap;
+  }
+
+  .status-active,
+  .status-default {
+    background: #f3f4f6;
+    color: #1a1a1a;
+  }
+
+  .status-review {
+    background: #fff7ed;
+    color: #c2410c;
+  }
+
+  .status-risk {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .status-blocked {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+
+  .task-card-title {
+    display: block;
+    margin-top: 12px;
+    color: #111827;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .task-card-meta {
+    display: block;
+    margin-top: 4px;
+    color: #6b7280;
+    font-size: 14px;
+  }
+
+  .task-card-blocker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    color: #111827;
+    font-size: 12px;
+    font-weight: 600;
+    flex-wrap: wrap;
+  }
+
+  .task-card-blocker b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 10px;
+    background: #f3f4f6;
+    color: #1a1a1a;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .active-task-empty {
+    padding: 12px 0 4px;
+    color: #9ca3af;
+    font-size: 14px;
   }
 
   .owner-more-link {
@@ -2085,28 +2326,514 @@ const overviewCss = `
     align-items: center;
     gap: 10px;
     width: fit-content;
-    margin-top: 8px;
+    margin-top: 0;
     border: none;
     background: transparent;
     padding: 0;
-    color: #111827;
-    font-size: 16px;
+    color: #1677ff;
+    font-size: 14px;
     font-weight: 500;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .task-chain-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+  }
+
+  .task-chain-dialog {
+    width: min(960px, calc(100vw - 48px));
+    overflow: hidden;
+    border: 1px solid #e5e5e5;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 28px 80px rgba(17, 24, 39, 0.22);
+  }
+
+  .task-chain-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 24px;
+    border-bottom: 1px solid #e5e5e5;
+  }
+
+  .task-chain-header h2 {
+    margin: 0;
+    color: #1a1a1a;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .task-chain-header p {
+    margin: 10px 0 0;
+    color: #666666;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .task-chain-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #1a1a1a;
     cursor: pointer;
   }
 
-  .tone-blue { background: #0d6efd; color: #0d6efd; }
-  .tone-green { background: #16a34a; color: #16a34a; }
-  .tone-orange { background: #ff6b00; color: #ff6b00; }
-  .tone-red { background: #ef4444; color: #ef4444; }
-  .tone-yellow { background: #facc15; color: #facc15; }
-  .tone-gray { background: #d1d5db; color: #9ca3af; }
+  .task-chain-body {
+    padding: 24px;
+  }
 
-  .overview-metric-icon.tone-blue,
-  .overview-metric-icon.tone-green,
-  .overview-metric-icon.tone-orange,
-  .overview-metric-icon.tone-red {
+  .task-chain-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .task-chain-steps {
+    display: grid;
+    gap: 16px;
+  }
+
+  .task-step-card {
+    position: relative;
+    min-height: 128px;
+    padding: 16px;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    background: #ffffff;
+  }
+
+  .task-step-card.is-current {
+    border-color: #111111;
+    box-shadow: 0 0 0 1px #111111;
+  }
+
+  .task-step-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .task-step-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #111111;
     color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .task-step-role-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .task-step-role {
+    color: #666666;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .task-step-current-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #111111;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .task-step-dot {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ff4d4f;
+    box-shadow: 0 0 0 2px #ffffff;
+  }
+
+  .task-step-title {
+    display: block;
+    margin-top: 14px;
+    color: #111111;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .task-step-meta {
+    display: block;
+    margin-top: 14px;
+    color: #999999;
+    font-size: 13px;
+  }
+
+  .task-step-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    margin-top: 12px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .task-chain-progress {
+    position: relative;
+    padding-top: 4px;
+  }
+
+  .task-chain-progress-track {
+    position: absolute;
+    top: 15px;
+    left: calc((100% / var(--task-chain-count, 4)) / 2);
+    right: calc((100% / var(--task-chain-count, 4)) / 2);
+    z-index: 0;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5e5e5;
+  }
+
+  .task-chain-progress-track i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #111111;
+  }
+
+  .task-chain-progress-dots {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 16px;
+  }
+
+  .task-chain-progress-dots span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin: 0 auto;
+    border: 1px solid #d1d5db;
+    border-radius: 50%;
+    color: #999999;
+    font-size: 12px;
+    font-weight: 600;
+    background: #ffffff;
+    box-shadow: 0 0 0 6px #ffffff;
+  }
+
+  .task-chain-progress-dots span.is-done {
+    border-color: #111111;
+    background: #111111;
+    color: #ffffff;
+  }
+
+  .task-chain-progress-dots span.is-active {
+    border-color: #111111;
+    background: #111111;
+    color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(17, 17, 17, 0.08);
+  }
+
+  .task-chain-empty {
+    color: #999999;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .progress-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 135;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+  }
+
+  .progress-dialog {
+    width: min(720px, calc(100vw - 48px));
+    max-height: min(80vh, 820px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 24px 72px rgba(17, 24, 39, 0.2);
+  }
+
+  .progress-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 24px;
+    border-bottom: 1px solid #e5e5e5;
+  }
+
+  .progress-dialog-title-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .progress-dialog-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #fa8c16;
+    color: #ffffff;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .progress-dialog-header h2 {
+    margin: 0;
+    color: #1a1a1a;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .progress-dialog-header p {
+    margin: 8px 0 0;
+    color: #666666;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .progress-dialog-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: #999999;
+    cursor: pointer;
+  }
+
+  .progress-dialog-body {
+    padding: 20px 24px 24px;
+    overflow: auto;
+  }
+
+  .progress-overview-card {
+    padding: 20px;
+    border-radius: 12px;
+    background: #f9fafb;
+  }
+
+  .progress-overview-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr 120px;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .progress-overview-main span,
+  .progress-overview-main em {
+    display: block;
+  }
+
+  .progress-overview-main span {
+    color: #1a1a1a;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .progress-overview-main strong {
+    display: block;
+    margin-top: 8px;
+    color: #fa541c;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .progress-overview-main > div:nth-child(2) strong {
+    color: #1f2937;
+  }
+
+  .progress-overview-main em {
+    margin-top: 6px;
+    color: #1f2937;
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  .lag-column {
+    padding-left: 16px;
+    border-left: 1px solid #e5e5e5;
+  }
+
+  .progress-overview-track {
+    position: relative;
+    height: 8px;
+    margin-top: 16px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5e5e5;
+  }
+
+  .progress-overview-track i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    height: 100%;
+    border-radius: inherit;
+  }
+
+  .progress-overview-track .planned {
+    background: rgba(250, 140, 22, 0.28);
+  }
+
+  .progress-overview-track .actual {
+    background: #fa8c16;
+  }
+
+  .progress-task-section {
+    margin-top: 20px;
+  }
+
+  .progress-task-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    color: #1a1a1a;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .done-dot,
+  .todo-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .done-dot {
+    background: #52c41a;
+  }
+
+  .todo-dot {
+    background: #ff4d4f;
+  }
+
+  .progress-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .progress-task-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) 160px 110px;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid #f1f3f5;
+    border-radius: 10px;
+    background: #ffffff;
+  }
+
+  .progress-task-main {
+    min-width: 0;
+  }
+
+  .progress-task-main strong,
+  .progress-task-main span {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .progress-task-main strong {
+    color: #1a1a1a;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .progress-task-main span,
+  .progress-task-time {
+    color: #666666;
+    font-size: 13px;
+  }
+
+  .progress-task-tag {
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 88px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .progress-task-tag.done {
+    background: rgba(82, 196, 26, 0.12);
+    color: #52c41a;
+  }
+
+  .progress-task-tag.overdue {
+    background: rgba(255, 77, 79, 0.12);
+    color: #ff4d4f;
+  }
+
+  .progress-task-tag.soon {
+    background: rgba(250, 173, 20, 0.14);
+    color: #faad14;
+  }
+
+  .progress-task-tag.normal {
+    background: #f3f4f6;
+    color: #6b7280;
   }
 
   .create-dialog-backdrop {
@@ -2364,6 +3091,28 @@ const overviewCss = `
   .date-input .fi {
     color: #1a1a1a;
     font-size: 16px;
+  }
+
+  .date-input-picker {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .date-input-picker .date-time-picker,
+  .date-input-picker .date-time-trigger {
+    width: 100%;
+  }
+
+  .date-input-picker .date-time-trigger {
+    min-height: 38px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .date-input-picker .date-time-icon {
+    display: none;
   }
 
   .date-input input,
@@ -3222,22 +3971,14 @@ const overviewCss = `
       margin-top: 18px;
     }
 
-    .panel-row {
-      grid-template-columns: minmax(430px, 1fr) minmax(360px, 0.9fr);
+    .task-card-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+  }
 
-    .owner-panel {
-      grid-column: 1 / -1;
-    }
-
-    .owner-list {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      align-items: center;
-    }
-
-    .owner-more-link {
-      margin-top: 0;
+  @media (max-width: 1280px) {
+    .task-card-grid {
+      grid-template-columns: 1fr;
     }
   }
 `;
