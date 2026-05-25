@@ -8,6 +8,7 @@ import { canAccessNav, ROLE_OPTIONS, UserRole } from "../data/permissions";
 
 export type NavKey =
   | "overview"
+  | "projects"
   | "control.create"
   | "control.publish"
   | "control.board"

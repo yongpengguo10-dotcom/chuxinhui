@@ -6,7 +6,7 @@ const HEADER_AVATAR = "https://images.unsplash.com/photo-1500648767791-00dcc994a
 
 const TOP_NAV_ITEMS: { label: string; key: NavKey }[] = [
   { label: "概览", key: "overview" },
-  { label: "项目", key: "overview" },
+  { label: "项目", key: "projects" },
   { label: "任务", key: "control.board" },
   { label: "资源库", key: "library.project-images" },
   { label: "团队", key: "library.people" },
@@ -28,6 +28,7 @@ export function GlobalTopNav({
 }: GlobalTopNavProps) {
   const activeTopKey = useMemo(() => {
     if (activeNav === "overview") return "overview";
+    if (activeNav === "projects") return "projects";
     if (activeNav === "control.board" || activeNav === "control.publish" || activeNav === "control.risk" || activeNav === "control.review") {
       return "control.board";
     }

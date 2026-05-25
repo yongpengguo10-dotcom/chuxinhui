@@ -16,6 +16,7 @@ export const ROLE_OPTIONS: { role: UserRole; name: string; subtitle: string }[] 
 
 const PUBLIC_NAVS: NavKey[] = [
   "overview",
+  "projects",
   "library.people",
   "library.project-images",
   "library.common-images",

@@ -9,6 +9,7 @@ import { ProjectImageLibrary, ProjectImage } from "./pages/ProjectImageLibrary";
 import { CommonImageLibrary } from "./pages/CommonImageLibrary";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { ProjectOverview } from "./pages/ProjectOverview";
+import { ProjectHistory } from "./pages/ProjectHistory";
 import { TaskBoard } from "./pages/TaskBoard";
 import { PublishTask } from "./pages/PublishTask";
 import { RiskTracking } from "./pages/RiskTracking";
@@ -27,12 +28,48 @@ import {
 } from "./data/dataStore";
 import { canAccessNav, canManageLocalData, UserRole } from "./data/permissions";
 
+const NAV_KEYS = new Set<NavKey>([
+  "overview",
+  "projects",
+  "control.create",
+  "control.publish",
+  "control.board",
+  "control.risk",
+  "control.review",
+  "recruitment",
+  "market.design",
+  "market.copy",
+  "market.video",
+  "market.ops",
+  "market.cs",
+  "market.field",
+  "benefits",
+  "checkin",
+  "ai.report",
+  "library.people",
+  "library.project-images",
+  "library.common-images",
+]);
+
+function readNavFromHash(): NavKey | null {
+  if (typeof window === "undefined") return null;
+  const key = window.location.hash.replace(/^#\/?/, "");
+  return NAV_KEYS.has(key as NavKey) ? key as NavKey : null;
+}
+
+function writeNavHash(key: NavKey) {
+  if (typeof window === "undefined" || key === "control.create") return;
+  const nextHash = `#/${key}`;
+  if (window.location.hash === nextHash) return;
+  window.history.pushState(null, "", nextHash);
+}
+
 export default function App() {
   const isMobile = useIsMobile();
   const backupInputRef = useRef<HTMLInputElement>(null);
   const initialState = useMemo(() => loadWorkbenchState(), []);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState<NavKey>("overview");
+  const [activeNav, setActiveNav] = useState<NavKey>(() => readNavFromHash() ?? "overview");
   const [createProjectRequest, setCreateProjectRequest] = useState(0);
   const [currentRole, setCurrentRole] = useState<UserRole>("管理员");
   const [projects, setProjects] = useState<Project[]>(initialState.projects);
@@ -63,9 +100,25 @@ export default function App() {
   useEffect(() => {
     if (!canAccessNav(currentRole, activeNav)) {
       setActiveNav("overview");
+      writeNavHash("overview");
       showToast("已切换到当前角色可访问的页面");
     }
   }, [currentRole, activeNav]);
+
+  useEffect(() => {
+    const syncNavFromHash = () => {
+      const nextNav = readNavFromHash();
+      if (nextNav && canAccessNav(currentRole, nextNav)) {
+        setActiveNav(nextNav);
+      }
+    };
+    window.addEventListener("hashchange", syncNavFromHash);
+    window.addEventListener("popstate", syncNavFromHash);
+    return () => {
+      window.removeEventListener("hashchange", syncNavFromHash);
+      window.removeEventListener("popstate", syncNavFromHash);
+    };
+  }, [currentRole]);
 
   const openDrawer = () => setDrawerOpen(true);
   const closeDrawer = () => setDrawerOpen(false);
@@ -79,14 +132,17 @@ export default function App() {
     if (!canAccessNav(currentRole, key)) {
       showToast("当前角色没有这个页面的操作权限");
       setActiveNav("overview");
+      writeNavHash("overview");
       return;
     }
     if (key === "control.create") {
       setActiveNav("overview");
+      writeNavHash("overview");
       setCreateProjectRequest(prev => prev + 1);
       return;
     }
     setActiveNav(key);
+    writeNavHash(key);
   };
 
   const handleRoleChange = (role: UserRole) => {
@@ -250,6 +306,17 @@ export default function App() {
           onNavigate={onNavigate}
           isMobile={isMobile}
           onOpenDrawer={openDrawer}
+          showToast={showToast}
+        />
+      );
+      break;
+
+    case "projects":
+      pageContent = (
+        <ProjectHistory
+          projects={projects}
+          tasks={tasks}
+          projectImages={projectImages}
           showToast={showToast}
         />
       );
@@ -551,7 +618,7 @@ export default function App() {
         display: "flex",
         flexDirection: useTopNavLayout ? "column" : "row",
         overflow: "hidden",
-        background: isOverviewPage ? "#F9FAFB" : "#F8F6EF",
+        background: "#F9FAFB",
         fontFamily: "'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
@@ -562,6 +629,7 @@ export default function App() {
           canCreateProject={canManageData}
           onCreateProject={() => {
             setActiveNav("overview");
+            writeNavHash("overview");
             setCreateProjectRequest(prev => prev + 1);
           }}
         />
